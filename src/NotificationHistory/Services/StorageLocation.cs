@@ -2,12 +2,31 @@ namespace NotificationHistory.Services;
 
 public static class StorageLocation
 {
-    public const string GroupId = "group.com.faikal.notificationhistory";
+    public const string GroupId = NotificationHistory.Core.Services.SignedAppGroups.PreferredGroup;
     public static string DatabasePath()
     {
 #if IOS
-        var container = Foundation.NSFileManager.DefaultManager.GetContainerUrl(GroupId)
-         ?? throw new InvalidOperationException("App Group unavailable. Sign the app and both extensions with the same authorized App Group entitlement.");
+        string group;
+        try
+        {
+            var app = Foundation.NSBundle.MainBundle;
+            string Executable(Foundation.NSBundle? bundle) => bundle?.ExecutableUrl?.Path
+                ?? throw new IOException("An app extension is missing.");
+            var widget = Foundation.NSBundle.FromPath(Path.Combine(app.BundlePath, "PlugIns", "NotificationHistoryWidget.appex"));
+            var intents = Foundation.NSBundle.FromPath(Path.Combine(app.BundlePath, "Extensions", "NotificationHistoryIntents.appex"));
+            group = NotificationHistory.Core.Services.SignedAppGroups.SelectCommon(
+                new[] { Executable(app), Executable(widget), Executable(intents) }
+                    .Select(NotificationHistory.Core.Services.SignedAppGroups.Read));
+        }
+        catch (NotificationHistory.Core.Services.SharedStorageConfigurationException) { throw; }
+        catch (Exception signingError)
+        {
+            throw new NotificationHistory.Core.Services.SharedStorageConfigurationException(
+                "Cannot read shared-storage signing information. Re-sign the app and both extensions with matching App Groups.", signingError);
+        }
+        var container = Foundation.NSFileManager.DefaultManager.GetContainerUrl(group)
+         ?? throw new NotificationHistory.Core.Services.SharedStorageConfigurationException(
+             $"iOS cannot open the signed App Group ({group}). Re-sign the app and both extensions with profiles that authorize this group, then unlock your iPhone once after restarting.");
         var directory = Path.Combine(container.Path!, "Library", "NotificationHistory");
         Directory.CreateDirectory(directory);
         var attributes = new Foundation.NSFileAttributes { ProtectionKey = Foundation.NSFileProtection.CompleteUntilFirstUserAuthentication };

@@ -40,13 +40,15 @@ final class SharedDatabase {
     private var handle: OpaquePointer?
     private var writerLock: SharedWriterLock?
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-    static let group = "group.com.faikal.notificationhistory"
 
     init(readOnly: Bool = false, testingPath: URL? = nil, schemaURL: URL? = nil) throws {
         let file: URL
         if let testingPath { file = testingPath }
         else {
-            guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Self.group) else { throw HistoryError.unavailable }
+            let group = try SignedAppGroups.group()
+            guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group) else {
+                throw SharedStorageConfigurationError.unavailableGroup(group)
+            }
             let directory = container.appendingPathComponent("Library/NotificationHistory", isDirectory: true)
             if !readOnly {
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

@@ -35,7 +35,7 @@ public sealed class NotificationsViewModel(AppServices services) : ObservableVie
             finally { Busy = false; loading.Release(); }
         }
         catch (OperationCanceledException) { }
-        catch { await AppServices.AlertAsync("History unavailable", "Could not read history. Check device storage and try again."); }
+        catch (Exception error) { await AppServices.StorageAlertAsync(error, "History unavailable", "Could not read history. Check device storage and try again."); }
     }
     public async Task LoadMoreAsync()
     {

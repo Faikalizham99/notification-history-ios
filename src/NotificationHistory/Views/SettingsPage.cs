@@ -37,5 +37,5 @@ public sealed class SettingsPage : ContentPage
             appearance.SelectedItem = await services.Database.SettingAsync("appearance") ?? "System";
         }); ready = true;
     }
-    private static async Task Run(Func<Task> action) { try { await action(); } catch { await AppServices.AlertAsync("Settings unavailable", "Your changes could not be saved. Please try again."); } }
+    private static async Task Run(Func<Task> action) { try { await action(); } catch (Exception error) { await AppServices.StorageAlertAsync(error, "Settings unavailable", "Your changes could not be saved. Please try again."); } }
 }

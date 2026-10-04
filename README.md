@@ -45,7 +45,7 @@ Third-party notification
 MAUI history, details, settings           WidgetKit read-only snapshots
 ```
 
-The authoritative database and settings live in one shared container. There are no separate history databases or JSON snapshots. On iOS both C# and Swift use the system SQLite engine. Desktop tests use the SQLite package’s bundled engine. If the App Group cannot be accessed, the app shows a storage error; it does not silently create private fallback history.
+The authoritative database and settings live in one shared container. There are no separate history databases or JSON snapshots. On iOS both C# and Swift use the system SQLite engine. Desktop tests use the SQLite package’s bundled engine. The app and native extensions read App Group IDs from the installed executable signatures and intersect all three sets. They prefer `group.com.faikal.notificationhistory` when it remains authorized everywhere; otherwise, they choose the same first identifier in ordinal order from the common set. This supports signing services that rewrite App Groups. Only signature metadata is read, without loading executable code or uploading signing data. iOS still enforces container authorization. If a component is missing, the signatures share no group, or the selected container cannot be accessed, the app reports the signing problem; it does not silently create private fallback history.
 
 `shared/schema.sql` is embedded in C# and copied into both extensions. Version 1 is established inside `BEGIN IMMEDIATE`; SQLite’s `user_version` records it. Unknown newer schemas are rejected. Future migrations must be ordered, transactional, and understood by every writing process; never independently migrate the widget. The widget only reads schema 1.
 
@@ -141,7 +141,7 @@ Small and medium row taps use `notificationhistory://notification/123`; backgrou
 
 The widget uses `NSExtensionPointIdentifier=com.apple.widgetkit-extension`. The App Intents target is an **ExtensionKit** extension, with `EXAppExtensionAttributes/EXExtensionPointIdentifier=com.apple.appintents-extension`, not a legacy SiriKit intents-service target. It belongs under `Extensions`. The MAUI project embeds the widget through `AdditionalAppExtensions`, the bridge through `NativeReference`, and the intent through a custom copy/signing target because the .NET SDK’s standard extension copier targets `PlugIns`. Both native Info.plists, entitlements, and the project specification are tracked. [Microsoft extension/build items](https://learn.microsoft.com/en-us/dotnet/ios/building-apps/build-items), [XcodeGen product types](https://github.com/yonaskolb/XcodeGen/blob/master/Docs/ProjectSpec.md#product-type), [ExtensionKit target example](https://github.com/tuist/XcodeProj/issues/687).
 
-If changing identifiers, update both MAUI and Swift storage constants, all entitlements, bundle IDs, workflow validation constants, and signing profiles together. Never let re-signing rewrite App Group entitlements without matching the hard-coded container ID.
+If changing source identifiers, update the preferred App Group in both managed and native resolvers, source entitlements, bundle IDs, workflow validation constants, and signing profiles together. Signing services may rewrite App Group IDs if the installed app and both extensions retain at least one common authorized group. Changing the group changes the shared container; it does not migrate existing history from another group.
 
 ## GitHub Actions and releases
 
@@ -183,6 +183,16 @@ unzip -l NotificationHistory-v1.0.0-ios-arm64.ipa
 ## Signing
 
 The default build disables signing. Your signing tool must preserve **both** extension folders and the framework, register/install the ExtensionKit component, sign nested components before the main app, and supply authorized profiles with the same App Group on the app/widget/intent IDs. Sideloading does not remove iOS sandbox, entitlement, or provisioning restrictions. Some personal/free signing setups cannot authorize the required App Group; without it, this architecture cannot share history. Confirm your setup supports this before relying on automatic capture.
+
+If a re-signed app reports shared-storage signing errors, inspect the **signed** entitlements and provisioning profiles rather than the unsigned source plist. Each extension needs signing/provisioning appropriate to its own bundle identifier. A provider can supply renamed App Groups, but copying the main app's application identifier onto every extension or omitting extension profiles can prevent widget/action registration even when the main app opens. Ask the signing provider to preserve and provision the nested components. The app cannot create Apple-authorized profiles itself.
+
+On Windows or macOS, inspect the shared-group selection from a signed IPA without installing or uploading it:
+
+```bash
+dotnet run --project tests/NotificationHistory.Tests -c Release -- --inspect-signing /path/to/signed.ipa
+```
+
+This reads all three executable entitlement blobs and prints their common selected App Group. It does not verify certificate trust or prove that iOS will launch the extensions. Native CI tests use the same synthetic signing fixtures to check that Swift and C# select identical groups and reject missing/malformed signing metadata.
 
 Register the bundle IDs and group with your Apple team and enable membership in each app/extension profile. The `com.apple.security.application-groups` entitlement and Data Protection class are supplied in the tracked plist files. The history directory is protected until first unlock after restart, excluded from backups, and inaccessible before that unlock. This permits later locked-device background capture, subject to Shortcuts execution policy. Copying does not securely erase old disk blocks; app-level SQLite encryption/biometric locking is not implemented.
 

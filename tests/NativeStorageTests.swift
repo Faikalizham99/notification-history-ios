@@ -9,6 +9,33 @@ final class ConcurrentFailures: @unchecked Sendable {
 @main
 struct NativeStorageTests {
     static func main() throws {
+        if CommandLine.arguments.count == 3 && CommandLine.arguments[1] == "--verify-signing" {
+            let directory = URL(fileURLWithPath: CommandLine.arguments[2])
+            func read(_ name: String) throws -> Set<String> { try SignedAppGroups.read(directory.appendingPathComponent(name + ".macho")) }
+            let original = try read("original")
+            guard try SignedAppGroups.selectCommon([original, original, original]) == SignedAppGroups.preferred else {
+                fatalError("Original shared group not preserved")
+            }
+            let app = try read("provider-app"), widget = try read("provider-widget"), intents = try read("provider-intents")
+            guard try SignedAppGroups.selectCommon([app, widget, intents]) == "group.provider.a",
+                  try read("invalid-groups") == ["group.provider.a"],
+                  try read("unsigned").isEmpty, try read("missing-groups").isEmpty else {
+                fatalError("Rewritten signing-group selection differs between Swift and C#")
+            }
+            var rejected = false
+            do { _ = try SignedAppGroups.selectCommon([app, widget, original]) } catch { rejected = true }
+            guard rejected else { fatalError("Mismatched groups accepted") }
+            rejected = false
+            do { _ = try SignedAppGroups.selectCommon([app, widget]) } catch { rejected = true }
+            guard rejected else { fatalError("Missing extension accepted") }
+            for name in ["truncated", "bad-offset", "bad-load", "bad-plist"] {
+                rejected = false
+                do { _ = try read(name) } catch { rejected = true }
+                guard rejected else { fatalError("Malformed signature accepted: " + name) }
+            }
+            print("PASS Swift/C# agree on original, rewritten, missing, and malformed App Group signing fixtures")
+            return
+        }
         let file = URL(fileURLWithPath: CommandLine.arguments[1])
         let schema = URL(fileURLWithPath: CommandLine.arguments[2])
         if CommandLine.arguments.count == 4 && CommandLine.arguments[3] == "--verify-seed" {

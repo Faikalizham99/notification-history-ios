@@ -31,6 +31,7 @@ targets:
         excludes: [Info.plist]
       - path: Shared/SharedDatabase.swift
       - path: Shared/SharedWriterLock.swift
+      - path: Shared/SignedAppGroups.swift
       - path: ../shared/schema.sql
         buildPhase: resources
     settings:
@@ -55,6 +56,7 @@ targets:
         excludes: [Info.plist]
       - path: Shared/SharedDatabase.swift
       - path: Shared/SharedWriterLock.swift
+      - path: Shared/SignedAppGroups.swift
       - path: ../shared/schema.sql
         buildPhase: resources
     settings:

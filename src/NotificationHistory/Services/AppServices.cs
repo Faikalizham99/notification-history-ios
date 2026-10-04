@@ -20,9 +20,13 @@ public sealed class AppServices(NotificationDatabase database)
     public async Task RefreshAsync()
     {
         try { await Database.CleanupAsync(); NotifyChanged(); }
-        catch { await AlertAsync("Storage unavailable", "History could not be refreshed. Check device storage and App Group signing."); }
+        catch (Exception error) { await StorageAlertAsync(error, "Storage unavailable", "History could not be refreshed. Check device storage and App Group signing."); }
     }
     public static Task AlertAsync(string title, string message) => Application.Current!.Windows[0].Page!.DisplayAlertAsync(title, message, "OK");
+    public static Task StorageAlertAsync(Exception error, string title, string fallback) =>
+        error is SharedStorageConfigurationException
+            ? AlertAsync("Shared storage signing", error.Message)
+            : AlertAsync(title, fallback);
     public static Task<bool> ConfirmAsync(string title, string message) => Application.Current!.Windows[0].Page!.DisplayAlertAsync(title, message, "Delete", "Cancel");
     public async Task ApplyAppearanceAsync()
     {

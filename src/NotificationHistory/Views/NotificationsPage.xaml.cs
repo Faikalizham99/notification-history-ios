@@ -18,7 +18,7 @@ public partial class NotificationsPage : ContentPage
             if (await services.Database.SettingAsync("onboarded") != "yes") await Navigation.PushAsync(new OnboardingPage(services));
             else { services.MarkNavigationReady(); await services.ConsumeLinkAsync(); }
         }
-        catch { await AppServices.AlertAsync("Storage unavailable", "Check App Group signing and free space on the device."); }
+        catch (Exception error) { await AppServices.StorageAlertAsync(error, "Storage unavailable", "Check App Group signing and free space on the device."); }
     }
     protected override void OnDisappearing() { services.Changed -= OnChanged; base.OnDisappearing(); }
     private void OnChanged(object? sender, EventArgs e) => MainThread.BeginInvokeOnMainThread(async () => await vm.ReloadAsync());

@@ -1,6 +1,8 @@
 using NotificationHistory.Core.Data;
 using NotificationHistory.Core.Models;
 using NotificationHistory.Core.Services;
+if (args.Length == 2 && args[0] == "--inspect-signing") { SigningTests.InspectIpa(args[1]); return; }
+if (args.Length == 2 && args[0] == "--signing-fixtures") { SigningTests.WriteFixtures(args[1]); return; }
 if (args.Length == 2)
 {
     var shared = new NotificationDatabase(args[1]);
@@ -26,6 +28,7 @@ var directory = Path.Combine(Path.GetTempPath(), "NotificationHistory-tests-" + 
 Directory.CreateDirectory(directory);
 try
 {
+    SigningTests.Run(Path.Combine(directory, "signing"));
     var path = Path.Combine(directory, "history.sqlite3"); var db = new NotificationDatabase(path);
     var now = DateTimeOffset.UtcNow;
     var body = "Bro tomorrow jadi? 👋 明天见\n100% _ literal ' quote" + new string('x', 30000);
