@@ -2,7 +2,7 @@
 
 An iOS-first .NET 10 MAUI app for personal notification history. It stores the optional text supplied by a Shortcut, lets you search and manage that history, and provides small and medium native widgets. It contains no global notification listener, notification-service interception, cloud sync, analytics, or network upload code.
 
-**Implementation status:** the shared persistence checks and the Debug/Release managed iOS compilation pass on Windows. Native Swift builds, intent discovery, widget behavior, signed installation, notification-field mappings, and the complete IPA workflow still require macOS/iPhone validation. There is no claim that an IPA has already been produced. See [device acceptance checks](docs/DEVICE-VALIDATION.md).
+**Implementation status:** shared persistence checks pass on Windows and macOS. Native Swift framework/extension builds, concurrent Swift/.NET storage interoperability, and the Release iOS device app build have passed in GitHub Actions. Signed installation, intent discovery, widget behavior, and notification-field mappings still require validation on an iPhone. See [device acceptance checks](docs/DEVICE-VALIDATION.md).
 
 ## Apple platform investigation
 
@@ -109,7 +109,7 @@ python3 scripts/package-ipa.py \
 
 For simulator UI testing, build native products with `CONFIGURATION=Debug NATIVE_SDK=iphonesimulator bash scripts/build-native.sh`, then build MAUI in Debug with `iossimulator-arm64` on Apple Silicon (or `iossimulator-x64` on Intel), passing the absolute `Debug-iphonesimulator` NativeBuildDir. Simulator App Group behavior is not proof of device provisioning. Use `xcrun simctl install booted <app-path>` and `xcrun simctl launch booted com.faikal.notificationhistory` after building. For physical-device UI tests, re-sign/install the Debug app using your setup; Settings → Development tools allows custom source/title/subtitle/message/date, sample insertion, and deep-link testing. Release builds omit that page and its sample text.
 
-The cross-storage script seeds via C#, reads/writes via Swift, runs C# and Swift writers simultaneously, checks native widget snapshots, then verifies Unicode and integrity in C#. It needs macOS and has not been run in the Windows workspace. `SkipNativeIntegration=true` exists only to allow macOS managed compilation checks; such a build must not be installed or packaged as complete.
+The cross-storage script seeds via C#, reads/writes via Swift, runs C# and Swift writers simultaneously, checks native widget snapshots, then verifies Unicode and integrity in C#. These checks have passed on macOS in GitHub Actions. `SkipNativeIntegration=true` exists only to allow macOS managed compilation checks; such a build must not be installed or packaged as complete.
 
 ## Shortcuts setup
 
@@ -145,19 +145,21 @@ If changing identifiers, update both MAUI and Swift storage constants, all entit
 
 ## GitHub Actions and releases
 
-`.github/workflows/build-ios.yml` runs on `v*.*.*` tags or manual dispatch (enter a three-part version). It uses `macos-latest`, Release, and **ios-arm64**. Version `v1.0.0` yields display version `1.0.0`; a separate valid three-part numeric build number derives from the Actions run/attempt counters. It caches NuGet packages, installs only MAUI iOS, builds native targets once, checks persistence/interoperability, then builds the device app and validates the IPA. The timeout is 45 minutes and obsolete builds on the same reference cancel. Read-only repository permissions suffice; it does not publish GitHub Releases.
+`.github/workflows/build-ios.yml` runs on `v*.*.*` tags or manual dispatch (enter a three-part version). It uses `macos-latest`, Release, and **ios-arm64**. Version `v1.0.2` yields display version `1.0.2`; a separate valid three-part numeric build number derives from the Actions run/attempt counters. The app, widget, App Intent extension, and bridge share both versions. It caches NuGet packages, installs only MAUI iOS, builds native targets once, checks persistence/interoperability, then builds the device app and validates the IPA. The timeout is 45 minutes and obsolete builds on the same reference cancel. Read-only repository permissions suffice; it does not publish GitHub Releases.
 
 This repository currently uses **main**:
 
 ```bash
 git add .
-git commit -m "Release v1.0.0"
-git tag v1.0.0
+git commit -m "Release v1.0.2"
+git tag -a v1.0.2 -m "Release v1.0.2"
 git push origin main
-git push origin v1.0.0
+git push origin v1.0.2
 ```
 
-In Actions → Build Notification History IPA → completed run → Artifacts, download `NotificationHistory-v1.0.0-ios-arm64`. The archive contains **NotificationHistory-v1.0.0-ios-arm64.ipa**, a validation report/checksum, and entitlement files for re-signing. A separate Windows check workflow verifies shared logic and managed Release compilation on main/PRs. No workflow has been dispatched by this implementation session.
+Use a new version for each release; rerunning an older tag still builds that tag's original code.
+
+In Actions → Build Notification History IPA → successful run → Artifacts, download `NotificationHistory-v1.0.2-ios-arm64` (or the version you selected). The archive contains **NotificationHistory-v1.0.2-ios-arm64.ipa**, a validation report/checksum, and entitlement files for re-signing. A separate Windows check workflow verifies shared logic and managed Release compilation on main/PRs.
 
 ## IPA validation
 
