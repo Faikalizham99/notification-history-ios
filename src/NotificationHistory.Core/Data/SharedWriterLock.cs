@@ -13,8 +13,10 @@ internal sealed class SharedWriterLock : IDisposable
 #else
     private const string SystemLibrary = "/usr/lib/libSystem.B.dylib";
 #endif
-    [DllImport(SystemLibrary, EntryPoint = "open", SetLastError = true)]
-    private static extern int Open([MarshalAs(UnmanagedType.LPUTF8Str)] string path, int flags, int mode);
+    // Darwin open() is variadic: its mode argument uses the stack on Apple Silicon.
+    // creat() has a fixed signature and opens the same empty lock inode on every call.
+    [DllImport(SystemLibrary, EntryPoint = "creat", SetLastError = true)]
+    private static extern int Create([MarshalAs(UnmanagedType.LPUTF8Str)] string path, ushort mode);
     [DllImport(SystemLibrary, EntryPoint = "flock", SetLastError = true)]
     private static extern int Flock(int descriptor, int operation);
     [DllImport(SystemLibrary, EntryPoint = "close")]
@@ -23,15 +25,21 @@ internal sealed class SharedWriterLock : IDisposable
     public static SharedWriterLock? Acquire(string path, CancellationToken token)
     {
         if (!OperatingSystem.IsIOS() && !OperatingSystem.IsMacOS()) return null;
-        // Darwin: O_CREAT | O_RDWR, owner read/write (0600).
-        var descriptor = Open(path + ".lock", 0x0200 | 2, 0x0180);
-        if (descriptor < 0) throw new IOException("Cannot access the shared history lock.");
+        // Owner read/write (0600). Truncation is safe: this file holds no data;
+        // flock locks the inode, which creat preserves when the file already exists.
+        var descriptor = Create(path + ".lock", 0x0180);
+        if (descriptor < 0)
+            throw new IOException($"Cannot access the shared history lock (errno {Marshal.GetLastPInvokeError()}).");
         try
         {
             var timer = Stopwatch.StartNew();
             while (Flock(descriptor, 2 | 4) != 0)
             {
+                var error = Marshal.GetLastPInvokeError();
                 token.ThrowIfCancellationRequested();
+                // Darwin EINTR (4) and EWOULDBLOCK/EAGAIN (35) can be retried.
+                if (error != 4 && error != 35)
+                    throw new IOException($"Cannot acquire the shared history lock (errno {error}).");
                 if (timer.Elapsed >= TimeSpan.FromSeconds(5)) throw new IOException("Shared history is busy. Please try again.");
                 Thread.Sleep(20);
             }

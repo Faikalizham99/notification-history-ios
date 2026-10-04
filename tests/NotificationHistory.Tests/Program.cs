@@ -30,6 +30,12 @@ try
     var now = DateTimeOffset.UtcNow;
     var body = "Bro tomorrow jadi? 👋 明天见\n100% _ literal ' quote" + new string('x', 30000);
     var id = await db.SaveAsync(new() { SourceApp = "App & 🐈", Title = "Ali", Body = body });
+    if (OperatingSystem.IsMacOS())
+    {
+        Check(File.Exists(path + ".lock"), "Darwin shared writer lock created");
+        Check(File.GetUnixFileMode(path + ".lock") == (UnixFileMode.UserRead | UnixFileMode.UserWrite),
+            "Darwin shared writer lock uses owner-only permissions");
+    }
     Check((await db.GetAsync(id))?.Body == body, "Unicode, multiline and long body round trip");
     var partial = await db.SaveAsync(new() { SourceApp = "Some App" });
     Check((await db.GetAsync(partial))?.Title is null, "Partial fields accepted");
