@@ -28,7 +28,7 @@ Relevant Apple references: [App Intents extensions](https://developer.apple.com/
 ## Requirements
 
 - .NET SDK **10.0.201**, pinned by `global.json`; MAUI Controls **10.0.20**.
-- Workload set **10.0.204.1**, `maui-ios`. Native/IPA builds require macOS and matching **Xcode 26.4/26.4.1**, plus XcodeGen (`brew install xcodegen`). The workflow selects `/Applications/Xcode_26.4.app` explicitly and fails if unavailable; update SDK, workload, and Xcode together when runner images change. [Runner inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-Readme.md).
+- Workload set **10.0.204.1**, `maui-ios`. Native/IPA builds require macOS and matching **Xcode 26.4/26.4.1**, plus XcodeGen (`brew install xcodegen`). The workflow resolves `/Applications/Xcode_26.4.app` to its physical directory, exports `DEVELOPER_DIR`, and checks the asset compiler before building. This avoids [.NET's asset-compiler lookup failure through an Xcode symlink](https://github.com/dotnet/macios/issues/21762). It fails if the matching Xcode is unavailable; update SDK, workload, and Xcode together when runner images change. [Runner inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-Readme.md).
 - Deployment target iOS **17+** for storage/UI/intents/widgets; the requested notification automation experience must be tested on **iOS 27**. No iOS 27-only SDK API is assumed in the code.
 - Physical iPhone and a signing setup that retains extensions and authorizes App Groups. An unsigned IPA is an input to signing, not an installable app.
 - GitHub Actions enabled on this repository for macOS builds. No signing secrets are needed for the default unsigned pipeline.

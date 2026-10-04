@@ -38,8 +38,14 @@ jobs:
       - name: Select matching Xcode
         run: |
           test -d /Applications/Xcode_26.4.app
-          sudo xcode-select --switch /Applications/Xcode_26.4.app/Contents/Developer
+          # .NET's actool lookup can fail through the runner's Xcode version symlink.
+          developer_dir="$(cd /Applications/Xcode_26.4.app/Contents/Developer && pwd -P)"
+          sudo xcode-select --switch "$developer_dir"
+          export DEVELOPER_DIR="$developer_dir"
+          echo "DEVELOPER_DIR=$developer_dir" >> "$GITHUB_ENV"
           xcodebuild -version
+          xcrun --sdk iphoneos --find actool
+          xcodebuild -sdk "$developer_dir/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" -find actool
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
