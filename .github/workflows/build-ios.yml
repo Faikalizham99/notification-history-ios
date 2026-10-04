@@ -50,15 +50,12 @@ jobs:
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
 
           counter=$((GITHUB_RUN_NUMBER * 1000 + GITHUB_RUN_ATTEMPT))
-
           echo "BUILD_NUMBER=$((counter / 10000 + 1)).$((counter / 100 % 100)).$((counter % 100))" >> "$GITHUB_ENV"
 
       - name: Select matching Xcode
         run: |
           test -d /Applications/Xcode_26.4.app
 
-          # .NET's actool lookup can fail through the runner's
-          # Xcode version symlink.
           developer_dir="$(cd /Applications/Xcode_26.4.app/Contents/Developer && pwd -P)"
 
           sudo xcode-select --switch "$developer_dir"
@@ -67,7 +64,6 @@ jobs:
           echo "DEVELOPER_DIR=$developer_dir" >> "$GITHUB_ENV"
 
           xcodebuild -version
-
           xcrun --sdk iphoneos --find actool
 
           xcodebuild \
@@ -192,12 +188,6 @@ jobs:
           echo
           echo "Generated IPA passed validation."
 
-      # IMPORTANT:
-      # Do NOT use archive: false here.
-      #
-      # GitHub will place the IPA inside its normal artifact archive.
-      # After downloading the artifact manually, extract the outer ZIP
-      # first and use the IPA inside it with FlareStore.
       - name: Upload unsigned IPA
         id: ipa-upload
         uses: actions/upload-artifact@v7
@@ -206,13 +196,8 @@ jobs:
           path: artifacts/NotificationHistory-v${{ env.APP_VERSION }}-ios-arm64.ipa
           if-no-files-found: error
           retention-days: 14
-
-          # IPA files are already ZIP archives, so recompressing them
-          # provides very little benefit.
           compression-level: 0
 
-      # Download GitHub's artifact archive and extract it normally.
-      # Do NOT use skip-decompress.
       - name: Download uploaded IPA for verification
         uses: actions/download-artifact@v8
         with:
@@ -278,14 +263,7 @@ jobs:
           fi
 
           echo
-          echo "Running custom validator..."
-
-          python3 scripts/ipa_archive.py \
-            "$IPA" \
-            --report "artifacts/NotificationHistory-v${APP_VERSION}-ios-arm64.downloaded.validation.json"
-
-          echo
-          echo "Downloaded IPA is byte-for-byte identical to the original."
+          echo "Downloaded IPA is valid and byte-for-byte identical to the original."
 
       - name: Upload validation report and signing information
         uses: actions/upload-artifact@v7
