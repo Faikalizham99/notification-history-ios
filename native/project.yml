@@ -40,6 +40,8 @@ targets:
     info:
       path: NotificationHistoryWidget/Info.plist
       properties:
+        CFBundleShortVersionString: '$(MARKETING_VERSION)'
+        CFBundleVersion: '$(CURRENT_PROJECT_VERSION)'
         CFBundleDisplayName: Notification History
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
@@ -63,6 +65,8 @@ targets:
     info:
       path: NotificationHistoryIntents/Info.plist
       properties:
+        CFBundleShortVersionString: '$(MARKETING_VERSION)'
+        CFBundleVersion: '$(CURRENT_PROJECT_VERSION)'
         CFBundleDisplayName: Notification History
         EXAppExtensionAttributes:
           EXExtensionPointIdentifier: com.apple.appintents-extension

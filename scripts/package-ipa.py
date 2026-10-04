@@ -28,8 +28,10 @@ def plist(path):
 def validate_bundle(bundle, bundle_id, version, build, extension_point=None):
     info = plist(bundle / "Info.plist")
     require(info["CFBundleIdentifier"] == bundle_id, f"Bundle ID mismatch: {bundle}")
-    require(info["CFBundleShortVersionString"] == version, f"Version mismatch: {bundle}")
-    require(str(info["CFBundleVersion"]) == build, f"Build number mismatch: {bundle}")
+    require(info["CFBundleShortVersionString"] == version,
+            f"Version mismatch: {bundle}: expected {version}, got {info['CFBundleShortVersionString']}")
+    require(str(info["CFBundleVersion"]) == build,
+            f"Build number mismatch: {bundle}: expected {build}, got {info['CFBundleVersion']}")
     require("iPhoneOS" in info.get("CFBundleSupportedPlatforms", []), f"Not a device build: {bundle}")
     if extension_point:
         actual = (info.get("EXAppExtensionAttributes", {}).get("EXExtensionPointIdentifier")
