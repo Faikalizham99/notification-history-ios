@@ -8,6 +8,7 @@ These checks need a signed build on an actual iOS 27 iPhone. They have not been 
 2. Re-sign the main app, `PlugIns/NotificationHistoryWidget.appex`, `Extensions/NotificationHistoryIntents.appex`, and embedded framework. Use matching App Group entitlements and authorized provisioning for both extensions and the app.
    If the signer renames App Groups, confirm that the installed app and both extensions share at least one authorized identifier. The app and extensions prefer the original group if common, otherwise select the first common identifier in ordinal order. Verify extension-specific application identifiers and provisioning profiles; main-app installation alone does not validate either extension.
 3. Preserve all embedded components. Install and launch. The app should show onboarding, rather than a storage error.
+   Import the unsigned IPA in FlareStore, sign it, and install through FlareStore. Test both importing and installation; a Files preview failure alone is not an installation test. If installation fails, record the detailed installer error and retain that newly signed IPA for local inspection.
 4. Reboot and unlock once before testing locked-device capture. Data Protection deliberately prevents access before that first unlock.
 
 ## Intent discovery and capture
@@ -43,6 +44,6 @@ These checks need a signed build on an actual iOS 27 iPhone. They have not been 
 2. Force-close the app during writes, reopen, and verify integrity through the storage test harness or a debugger using synthetic data. Do not delete SQLite sidecars to “recover” a database.
 3. Test low storage, revoked/mismatched App Group entitlements, removed extension, and future schema versions. Errors should surface without silently switching to a separate database.
 4. Re-sign a fresh build with reordered/renamed App Group entitlements. Confirm the app opens, Save Notification writes with the app closed, and both widget sizes read the same history. Mismatched groups must report the signing issue rather than suggesting only low disk space.
-4. Change timezone and cross a daylight-saving boundary. Counts and date filters should follow local day boundaries; stored times should remain UTC instants.
+5. Change timezone and cross a daylight-saving boundary. Counts and date filters should follow local day boundaries; stored times should remain UTC instants.
 
 Do not mark native integration, gallery discovery, closed-app execution, or end-to-end capture verified until these checks succeed.

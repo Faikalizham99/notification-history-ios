@@ -21,4 +21,5 @@ jobs:
           global-json-file: global.json
       - run: dotnet workload install maui-ios --version 10.0.204.1
       - run: dotnet run --project tests/NotificationHistory.Tests -c Release
+      - run: python -m unittest discover -s tests -p test_ipa_archive.py
       - run: dotnet build src/NotificationHistory -c Release -r iossimulator-x64 -p:EnableCodeSigning=false -p:TreatWarningsAsErrors=true

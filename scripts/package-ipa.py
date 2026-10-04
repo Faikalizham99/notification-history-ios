@@ -8,7 +8,7 @@ import re
 import shutil
 import subprocess
 import tempfile
-import zipfile
+from ipa_archive import write_ipa, validate_ipa
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 GROUP = "group.com.faikal.notificationhistory"
@@ -89,12 +89,8 @@ def main():
         payload = pathlib.Path(temp) / "Payload"
         payload.mkdir()
         shutil.copytree(args.app, payload / "NotificationHistory.app", symlinks=True)
-        # ditto retains executable permissions and framework symlinks.
-        subprocess.run(["ditto", "-c", "-k", "--keepParent", str(payload), str(args.output.resolve())], check=True)
-        with zipfile.ZipFile(args.output) as archive:
-            require(archive.testzip() is None, "Corrupt IPA zip")
-            require("Payload/NotificationHistory.app/PlugIns/NotificationHistoryWidget.appex/Info.plist" in archive.namelist(), "Widget missing from IPA")
-            require("Payload/NotificationHistory.app/Extensions/NotificationHistoryIntents.appex/Info.plist" in archive.namelist(), "Intent extension missing from IPA")
+        write_ipa(payload / "NotificationHistory.app", args.output)
+        validate_ipa(args.output)
         unpacked = pathlib.Path(temp) / "unpacked"
         subprocess.run(["ditto", "-x", "-k", str(args.output.resolve()), str(unpacked)], check=True)
         validate_app(unpacked / "Payload/NotificationHistory.app", args.version, args.build)

@@ -68,17 +68,30 @@ jobs:
             -p:NativeBuildDir="$GITHUB_WORKSPACE/artifacts/native/Build/Products/Release-iphoneos"
       - name: Validate app, package IPA, validate extracted IPA
         run: |
+          python3 -m unittest discover -s tests -p 'test_ipa_archive.py'
           python3 scripts/package-ipa.py \
             src/NotificationHistory/bin/Release/net10.0-ios/ios-arm64/NotificationHistory.app \
             --version "$APP_VERSION" --build "$BUILD_NUMBER" \
             --output "artifacts/NotificationHistory-v${APP_VERSION}-ios-arm64.ipa"
       - name: Upload unsigned IPA for direct download
+        id: ipa-upload
         uses: actions/upload-artifact@v7
         with:
           archive: false
           if-no-files-found: error
           retention-days: 14
           path: artifacts/NotificationHistory-v${{ env.APP_VERSION }}-ios-arm64.ipa
+      - name: Download the uploaded IPA for verification
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ steps.ipa-upload.outputs.artifact-id }}
+          path: .tmp/download-check
+          skip-decompress: true
+      - name: Verify the downloadable IPA
+        run: |
+          python3 scripts/ipa_archive.py \
+            ".tmp/download-check/NotificationHistory-v${APP_VERSION}-ios-arm64.ipa" \
+            --report "artifacts/NotificationHistory-v${APP_VERSION}-ios-arm64.validation.json"
       - name: Upload validation report and signing information
         uses: actions/upload-artifact@v7
         with:
@@ -90,3 +103,6 @@ jobs:
             artifacts/*.validation.json
             src/NotificationHistory/Platforms/iOS/Entitlements.plist
             native/Shared/Shared.entitlements
+      - name: Clean temporary download check
+        if: always()
+        run: rm -rf -- "$GITHUB_WORKSPACE/.tmp/download-check"
