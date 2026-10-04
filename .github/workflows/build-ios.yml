@@ -1,0 +1,85 @@
+name: Build Notification History IPA
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'App version (three numbers, e.g. 1.0.0)'
+        required: true
+        default: '1.0.0'
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      CONFIGURATION: Release
+      NATIVE_SDK: iphoneos
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "$REF_TYPE" == tag ]]; then version="${REF_NAME#v}"; else version="$INPUT_VERSION"; fi
+          if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then echo "Invalid version" >&2; exit 1; fi
+          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
+          counter=$((GITHUB_RUN_NUMBER * 1000 + GITHUB_RUN_ATTEMPT))
+          echo "BUILD_NUMBER=$((counter / 10000 + 1)).$((counter / 100 % 100)).$((counter % 100))" >> "$GITHUB_ENV"
+      - name: Select matching Xcode
+        run: |
+          test -d /Applications/Xcode_26.4.app
+          sudo xcode-select --switch /Applications/Xcode_26.4.app/Contents/Developer
+          xcodebuild -version
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-ios-${{ runner.arch }}-${{ hashFiles('**/*.csproj', 'global.json') }}
+          restore-keys: nuget-ios-${{ runner.arch }}-
+      - name: Install iOS workload and native project generator
+        run: |
+          dotnet workload install maui-ios --version 10.0.204.1
+          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+      - name: Verify persistence
+        run: dotnet run --project tests/NotificationHistory.Tests -c Release
+      - name: Build native framework and extensions
+        run: bash scripts/build-native.sh
+      - name: Verify native and managed storage interoperability
+        run: bash scripts/test-native-storage.sh
+      - name: Restore device app
+        run: dotnet restore src/NotificationHistory -r ios-arm64
+      - name: Build Release device app with extensions
+        run: |
+          dotnet build src/NotificationHistory -f net10.0-ios -c Release -r ios-arm64 --no-restore \
+            -p:EnableCodeSigning=false -p:BuildIpa=false \
+            -p:ApplicationDisplayVersion="$APP_VERSION" -p:ApplicationVersion="$BUILD_NUMBER" \
+            -p:NativeBuildDir="$GITHUB_WORKSPACE/artifacts/native/Build/Products/Release-iphoneos"
+      - name: Validate app, package IPA, validate extracted IPA
+        run: |
+          python3 scripts/package-ipa.py \
+            src/NotificationHistory/bin/Release/net10.0-ios/ios-arm64/NotificationHistory.app \
+            --version "$APP_VERSION" --build "$BUILD_NUMBER" \
+            --output "artifacts/NotificationHistory-v${APP_VERSION}-ios-arm64.ipa"
+      - name: Upload unsigned IPA and signing information
+        uses: actions/upload-artifact@v4
+        with:
+          name: NotificationHistory-v${{ env.APP_VERSION }}-ios-arm64
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            artifacts/*.ipa
+            artifacts/*.validation.json
+            src/NotificationHistory/Platforms/iOS/Entitlements.plist
+            native/Shared/Shared.entitlements

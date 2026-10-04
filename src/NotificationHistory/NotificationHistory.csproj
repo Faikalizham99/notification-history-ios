@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup>
+  <TargetFramework>net10.0-ios</TargetFramework><OutputType>Exe</OutputType><RootNamespace>NotificationHistory</RootNamespace>
+  <UseMaui>true</UseMaui><SingleProject>true</SingleProject>
+  <ApplicationTitle>Notification History</ApplicationTitle><ApplicationId>com.faikal.notificationhistory</ApplicationId>
+  <ApplicationDisplayVersion Condition="'$(ApplicationDisplayVersion)' == ''">1.0.0</ApplicationDisplayVersion>
+  <ApplicationVersion Condition="'$(ApplicationVersion)' == ''">1</ApplicationVersion>
+  <SupportedOSPlatformVersion>17.0</SupportedOSPlatformVersion>
+  <CodesignEntitlements>Platforms/iOS/Entitlements.plist</CodesignEntitlements>
+ </PropertyGroup>
+ <ItemGroup>
+  <MauiIcon Include="Resources/AppIcon/appicon.svg" Color="#087E8B" />
+  <MauiSplashScreen Include="Resources/Splash/splash.svg" Color="#087E8B" BaseSize="128,128" />
+  <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.20" />
+  <ProjectReference Include="../NotificationHistory.Core/NotificationHistory.Core.csproj" />
+ </ItemGroup>
+ <ItemGroup Condition="'$(NativeBuildDir)' != ''">
+  <NativeReference Include="$(NativeBuildDir)/NotificationHistoryBridge.framework">
+   <Kind>Framework</Kind><SmartLink>false</SmartLink>
+  </NativeReference>
+  <ReferenceNativeSymbol Include="nh_reload_widgets" SymbolType="Function" />
+  <AdditionalAppExtensions Include="$(NativeBuildDir)">
+   <Name>NotificationHistoryWidget</Name><BuildOutput>.</BuildOutput>
+   <CodesignEntitlements>../../native/Shared/Shared.entitlements</CodesignEntitlements>
+  </AdditionalAppExtensions>
+  <CodesignBundle Include="NotificationHistory.app/Extensions/NotificationHistoryIntents.appex">
+   <CodesignEntitlements>../../native/Shared/Shared.entitlements</CodesignEntitlements>
+   <BundleRelativePath>Extensions/</BundleRelativePath>
+  </CodesignBundle>
+ </ItemGroup>
+ <Target Name="EmbedNativeIntents" AfterTargets="_CopyAppExtensionsToBundle" Condition="'$(NativeBuildDir)' != ''">
+  <Error Condition="!Exists('$(NativeBuildDir)/NotificationHistoryIntents.appex/Info.plist')" Text="Build the native App Intents extension first." />
+  <Exec Command="ditto &quot;$(NativeBuildDir)/NotificationHistoryIntents.appex&quot; &quot;$(_AppBundlePath)/Extensions/NotificationHistoryIntents.appex&quot;" />
+ </Target>
+ <Target Name="RequireNativeComponents" BeforeTargets="Build" Condition="$([MSBuild]::IsOSPlatform('OSX')) and '$(NativeBuildDir)' == '' and '$(SkipNativeIntegration)' != 'true'">
+  <Error Text="Build native components and pass NativeBuildDir. Use SkipNativeIntegration=true only for a managed compilation check." />
+ </Target>
+</Project>

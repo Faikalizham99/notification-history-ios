@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/NotificationHistory.Core/NotificationHistory.Core.csproj" />
+    <Project Path="src/NotificationHistory/NotificationHistory.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/NotificationHistory.Tests/NotificationHistory.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,77 @@
+name: NotificationHistoryNative
+options:
+  deploymentTarget:
+    iOS: '17.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    CODE_SIGNING_ALLOWED: 'NO'
+    MARKETING_VERSION: '1.0.0'
+    CURRENT_PROJECT_VERSION: '1'
+    TARGETED_DEVICE_FAMILY: '1,2'
+    APPLICATION_EXTENSION_API_ONLY: 'YES'
+    SKIP_INSTALL: 'YES'
+targets:
+  NotificationHistoryBridge:
+    type: framework
+    platform: iOS
+    sources:
+      - path: NotificationHistoryBridge
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.faikal.notificationhistory.bridge
+        GENERATE_INFOPLIST_FILE: 'YES'
+        DEFINES_MODULE: 'YES'
+        LD_DYLIB_INSTALL_NAME: '@rpath/NotificationHistoryBridge.framework/NotificationHistoryBridge'
+  NotificationHistoryWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: NotificationHistoryWidget
+        excludes: [Info.plist]
+      - path: Shared/SharedDatabase.swift
+      - path: Shared/SharedWriterLock.swift
+      - path: ../shared/schema.sql
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.faikal.notificationhistory.widget
+        CODE_SIGN_ENTITLEMENTS: Shared/Shared.entitlements
+    info:
+      path: NotificationHistoryWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Notification History
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    dependencies:
+      - sdk: libsqlite3.tbd
+  NotificationHistoryIntents:
+    type: extensionkit-extension
+    platform: iOS
+    sources:
+      - path: NotificationHistoryIntents
+        excludes: [Info.plist]
+      - path: Shared/SharedDatabase.swift
+      - path: Shared/SharedWriterLock.swift
+      - path: ../shared/schema.sql
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.faikal.notificationhistory.intents
+        WRAPPER_EXTENSION: appex
+        CODE_SIGN_ENTITLEMENTS: Shared/Shared.entitlements
+    info:
+      path: NotificationHistoryIntents/Info.plist
+      properties:
+        CFBundleDisplayName: Notification History
+        EXAppExtensionAttributes:
+          EXExtensionPointIdentifier: com.apple.appintents-extension
+    dependencies:
+      - sdk: libsqlite3.tbd
+schemes:
+  NotificationHistoryNative:
+    build:
+      targets:
+        NotificationHistoryBridge: all
+        NotificationHistoryWidget: all
+        NotificationHistoryIntents: all
