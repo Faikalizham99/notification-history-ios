@@ -14,7 +14,7 @@ struct SaveNotificationIntent: AppIntent {
     @Parameter(title: "Capture ID", description: "Optional unique event ID for retries. Leave empty unless you have a real event identifier.") var captureID: String?
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Save notification from \(.$sourceApp)") {
+        Summary("Save notification from \(\.$sourceApp)") {
             \.$notificationTitle
             \.$subtitle
             \.$message
