@@ -145,7 +145,7 @@ If changing identifiers, update both MAUI and Swift storage constants, all entit
 
 ## GitHub Actions and releases
 
-`.github/workflows/build-ios.yml` runs on `v*.*.*` tags or manual dispatch (enter a three-part version). It uses `macos-latest`, Release, and **ios-arm64**. Version `v1.0.2` yields display version `1.0.2`; a separate valid three-part numeric build number derives from the Actions run/attempt counters. The app, widget, App Intent extension, and bridge share both versions. It caches NuGet packages, installs only MAUI iOS, builds native targets once, checks persistence/interoperability, then builds the device app and validates the IPA. The timeout is 45 minutes and obsolete builds on the same reference cancel. Read-only repository permissions suffice; it does not publish GitHub Releases.
+`.github/workflows/build-ios.yml` builds an IPA only when a **new `v*.*.*` tag is pushed**, on the first run attempt. Branch pushes, pull requests, tag updates/deletions, and reruns do not build an IPA; there is no manual dispatch trigger. It uses `macos-latest`, Release, and **ios-arm64**. Version `v1.0.2` yields display version `1.0.2`; a separate valid three-part numeric build number derives from the Actions run/attempt counters. The app, widget, App Intent extension, and bridge share both versions. It caches NuGet packages, installs only MAUI iOS, builds native targets once, checks persistence/interoperability, then builds the device app and validates the IPA. The timeout is 45 minutes and obsolete builds on the same reference cancel. Read-only repository permissions suffice; it does not publish GitHub Releases.
 
 This repository currently uses **main**:
 
@@ -157,9 +157,9 @@ git push origin main
 git push origin v1.0.2
 ```
 
-Use a new version for each release; rerunning an older tag still builds that tag's original code.
+Use a new version for each release or build retry. Older tags retain their original workflow configuration; the tag-only policy applies to new tags containing this workflow change.
 
-In Actions → Build Notification History IPA → successful run → Artifacts, download `NotificationHistory-v1.0.2-ios-arm64` (or the version you selected). The archive contains **NotificationHistory-v1.0.2-ios-arm64.ipa**, a validation report/checksum, and entitlement files for re-signing. A separate Windows check workflow verifies shared logic and managed Release compilation on main/PRs.
+In Actions → Build Notification History IPA → successful run → Artifacts, download `NotificationHistory-v1.0.2-ios-arm64` (or your tag's version). The archive contains **NotificationHistory-v1.0.2-ios-arm64.ipa**, a validation report/checksum, and entitlement files for re-signing. A separate Windows check workflow verifies shared logic and managed Release compilation on main/PRs without producing an IPA.
 
 ## IPA validation
 
