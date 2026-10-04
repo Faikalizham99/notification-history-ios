@@ -72,14 +72,21 @@ jobs:
             src/NotificationHistory/bin/Release/net10.0-ios/ios-arm64/NotificationHistory.app \
             --version "$APP_VERSION" --build "$BUILD_NUMBER" \
             --output "artifacts/NotificationHistory-v${APP_VERSION}-ios-arm64.ipa"
-      - name: Upload unsigned IPA and signing information
-        uses: actions/upload-artifact@v4
+      - name: Upload unsigned IPA for direct download
+        uses: actions/upload-artifact@v7
         with:
-          name: NotificationHistory-v${{ env.APP_VERSION }}-ios-arm64
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+          path: artifacts/NotificationHistory-v${{ env.APP_VERSION }}-ios-arm64.ipa
+      - name: Upload validation report and signing information
+        uses: actions/upload-artifact@v7
+        with:
+          name: NotificationHistory-v${{ env.APP_VERSION }}-signing-info
+          archive: true
           if-no-files-found: error
           retention-days: 14
           path: |
-            artifacts/*.ipa
             artifacts/*.validation.json
             src/NotificationHistory/Platforms/iOS/Entitlements.plist
             native/Shared/Shared.entitlements

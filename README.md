@@ -159,7 +159,7 @@ git push origin v1.0.2
 
 Use a new version for each release or build retry. Older tags retain their original workflow configuration; the tag-only policy applies to new tags containing this workflow change.
 
-In Actions → Build Notification History IPA → successful run → Artifacts, download `NotificationHistory-v1.0.2-ios-arm64` (or your tag's version). The archive contains **NotificationHistory-v1.0.2-ios-arm64.ipa**, a validation report/checksum, and entitlement files for re-signing. A separate Windows check workflow verifies shared logic and managed Release compilation on main/PRs without producing an IPA.
+In Actions → Build Notification History IPA → successful run → Artifacts, click **NotificationHistory-v1.0.2-ios-arm64.ipa** (or your tag's version) to download the IPA directly, without an outer ZIP. The workflow uses [`actions/upload-artifact@v7` with `archive: false`](https://github.com/actions/upload-artifact#upload-an-individual-file-unzipped) for the single IPA file. Download the separate `NotificationHistory-v1.0.2-signing-info` artifact for the validation report/checksum and entitlement files for re-signing; these supporting files are bundled in a ZIP. Downloads expire after 14 days. The direct IPA download applies to new tag builds containing this change; older artifacts keep their original format. A separate Windows check workflow verifies shared logic and managed Release compilation on main/PRs without producing an IPA.
 
 ## IPA validation
 

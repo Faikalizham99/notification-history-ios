@@ -4,7 +4,7 @@ These checks need a signed build on an actual iOS 27 iPhone. They have not been 
 
 ## Install and shared container
 
-1. Download the unsigned IPA from the Actions build triggered by a new release tag push. Confirm its validation report and checksum.
+1. Download the unsigned `.ipa` directly from the Actions build triggered by a new release tag push. Download the separate signing-info artifact for its validation report and entitlements, then confirm the IPA checksum.
 2. Re-sign the main app, `PlugIns/NotificationHistoryWidget.appex`, `Extensions/NotificationHistoryIntents.appex`, and embedded framework. Use matching App Group entitlements and authorized provisioning for both extensions and the app.
 3. Preserve all embedded components. Install and launch. The app should show onboarding, rather than a storage error.
 4. Reboot and unlock once before testing locked-device capture. Data Protection deliberately prevents access before that first unlock.
