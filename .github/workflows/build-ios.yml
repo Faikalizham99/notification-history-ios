@@ -1,97 +1,292 @@
 name: Build Notification History IPA
+
 on:
   push:
-    tags: ['v*.*.*']
+    tags:
+      - 'v*.*.*'
+
 permissions:
   contents: read
+
 concurrency:
   group: ios-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   build:
-    # Build once when a new release tag is pushed; skip tag edits/deletions and reruns.
-    if: github.event_name == 'push' && github.ref_type == 'tag' && github.event.created == true && github.event.deleted == false && github.run_attempt == '1'
+    # Build once when a new release tag is pushed;
+    # skip tag edits/deletions and reruns.
+    if: >
+      github.event_name == 'push' &&
+      github.ref_type == 'tag' &&
+      github.event.created == true &&
+      github.event.deleted == false &&
+      github.run_attempt == '1'
+
     runs-on: macos-latest
     timeout-minutes: 45
+
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
       DOTNET_NOLOGO: '1'
       CONFIGURATION: Release
       NATIVE_SDK: iphoneos
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Resolve version
         env:
           REF_NAME: ${{ github.ref_name }}
         run: |
           version="${REF_NAME#v}"
-          if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then echo "Invalid version" >&2; exit 1; fi
+
+          if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Invalid version" >&2
+            exit 1
+          fi
+
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
+
           counter=$((GITHUB_RUN_NUMBER * 1000 + GITHUB_RUN_ATTEMPT))
+
           echo "BUILD_NUMBER=$((counter / 10000 + 1)).$((counter / 100 % 100)).$((counter % 100))" >> "$GITHUB_ENV"
+
       - name: Select matching Xcode
         run: |
           test -d /Applications/Xcode_26.4.app
-          # .NET's actool lookup can fail through the runner's Xcode version symlink.
+
+          # .NET's actool lookup can fail through the runner's
+          # Xcode version symlink.
           developer_dir="$(cd /Applications/Xcode_26.4.app/Contents/Developer && pwd -P)"
+
           sudo xcode-select --switch "$developer_dir"
+
           export DEVELOPER_DIR="$developer_dir"
           echo "DEVELOPER_DIR=$developer_dir" >> "$GITHUB_ENV"
+
           xcodebuild -version
+
           xcrun --sdk iphoneos --find actool
-          xcodebuild -sdk "$developer_dir/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" -find actool
-      - uses: actions/setup-dotnet@v4
+
+          xcodebuild \
+            -sdk "$developer_dir/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk" \
+            -find actool
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-      - uses: actions/cache@v4
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
           key: nuget-ios-${{ runner.arch }}-${{ hashFiles('**/*.csproj', 'global.json') }}
-          restore-keys: nuget-ios-${{ runner.arch }}-
+          restore-keys: |
+            nuget-ios-${{ runner.arch }}-
+
       - name: Install iOS workload and native project generator
         run: |
           dotnet workload install maui-ios --version 10.0.204.1
-          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+
+          if ! command -v xcodegen >/dev/null; then
+            brew install xcodegen
+          fi
+
       - name: Verify persistence
-        run: dotnet run --project tests/NotificationHistory.Tests -c Release
+        run: |
+          dotnet run \
+            --project tests/NotificationHistory.Tests \
+            -c Release
+
       - name: Build native framework and extensions
-        run: bash scripts/build-native.sh
+        run: |
+          bash scripts/build-native.sh
+
       - name: Verify native and managed storage interoperability
-        run: bash scripts/test-native-storage.sh
+        run: |
+          bash scripts/test-native-storage.sh
+
       - name: Restore device app
-        run: dotnet restore src/NotificationHistory -r ios-arm64
+        run: |
+          dotnet restore \
+            src/NotificationHistory \
+            -r ios-arm64
+
       - name: Build Release device app with extensions
         run: |
-          dotnet build src/NotificationHistory -f net10.0-ios -c Release -r ios-arm64 --no-restore \
-            -p:EnableCodeSigning=false -p:BuildIpa=false \
-            -p:ApplicationDisplayVersion="$APP_VERSION" -p:ApplicationVersion="$BUILD_NUMBER" \
+          dotnet build \
+            src/NotificationHistory \
+            -f net10.0-ios \
+            -c Release \
+            -r ios-arm64 \
+            --no-restore \
+            -p:EnableCodeSigning=false \
+            -p:BuildIpa=false \
+            -p:ApplicationDisplayVersion="$APP_VERSION" \
+            -p:ApplicationVersion="$BUILD_NUMBER" \
             -p:NativeBuildDir="$GITHUB_WORKSPACE/artifacts/native/Build/Products/Release-iphoneos"
-      - name: Validate app, package IPA, validate extracted IPA
+
+      - name: Run IPA packaging tests
         run: |
-          python3 -m unittest discover -s tests -p 'test_ipa_archive.py'
+          python3 -m unittest discover \
+            -s tests \
+            -p 'test_ipa_archive.py'
+
+      - name: Package IPA
+        run: |
+          mkdir -p artifacts
+
           python3 scripts/package-ipa.py \
             src/NotificationHistory/bin/Release/net10.0-ios/ios-arm64/NotificationHistory.app \
-            --version "$APP_VERSION" --build "$BUILD_NUMBER" \
+            --version "$APP_VERSION" \
+            --build "$BUILD_NUMBER" \
             --output "artifacts/NotificationHistory-v${APP_VERSION}-ios-arm64.ipa"
-      - name: Upload unsigned IPA for direct download
+
+      - name: Verify generated IPA before upload
+        run: |
+          IPA="artifacts/NotificationHistory-v${APP_VERSION}-ios-arm64.ipa"
+
+          echo "========================================"
+          echo "Generated IPA information"
+          echo "========================================"
+
+          ls -lh "$IPA"
+
+          echo
+          echo "Checking file type..."
+          file "$IPA"
+
+          echo
+          echo "Testing ZIP/IPA integrity..."
+          unzip -t "$IPA"
+
+          echo
+          echo "Checking expected Payload structure..."
+          unzip -l "$IPA" | head -100
+
+          if ! unzip -l "$IPA" | grep -q "Payload/NotificationHistory.app/"; then
+            echo "ERROR: Payload/NotificationHistory.app/ was not found." >&2
+            exit 1
+          fi
+
+          if ! unzip -l "$IPA" | grep -q "Payload/NotificationHistory.app/Info.plist"; then
+            echo "ERROR: Info.plist was not found inside the application bundle." >&2
+            exit 1
+          fi
+
+          echo
+          echo "Running custom IPA validator..."
+
+          python3 scripts/ipa_archive.py \
+            "$IPA" \
+            --report "artifacts/NotificationHistory-v${APP_VERSION}-ios-arm64.validation.json"
+
+          echo
+          echo "Recording original IPA SHA-256..."
+
+          shasum -a 256 "$IPA" | tee /tmp/original-ipa.sha256
+
+          echo
+          echo "Generated IPA passed validation."
+
+      # IMPORTANT:
+      # Do NOT use archive: false here.
+      #
+      # GitHub will place the IPA inside its normal artifact archive.
+      # After downloading the artifact manually, extract the outer ZIP
+      # first and use the IPA inside it with FlareStore.
+      - name: Upload unsigned IPA
         id: ipa-upload
         uses: actions/upload-artifact@v7
         with:
-          archive: false
+          name: NotificationHistory-v${{ env.APP_VERSION }}-ios-arm64
+          path: artifacts/NotificationHistory-v${{ env.APP_VERSION }}-ios-arm64.ipa
           if-no-files-found: error
           retention-days: 14
-          path: artifacts/NotificationHistory-v${{ env.APP_VERSION }}-ios-arm64.ipa
-      - name: Download the uploaded IPA for verification
+
+          # IPA files are already ZIP archives, so recompressing them
+          # provides very little benefit.
+          compression-level: 0
+
+      # Download GitHub's artifact archive and extract it normally.
+      # Do NOT use skip-decompress.
+      - name: Download uploaded IPA for verification
         uses: actions/download-artifact@v8
         with:
           artifact-ids: ${{ steps.ipa-upload.outputs.artifact-id }}
           path: .tmp/download-check
-          skip-decompress: true
-      - name: Verify the downloadable IPA
+
+      - name: Verify downloaded IPA
         run: |
+          IPA=".tmp/download-check/NotificationHistory-v${APP_VERSION}-ios-arm64.ipa"
+
+          echo "========================================"
+          echo "Downloaded IPA verification"
+          echo "========================================"
+
+          if [[ ! -f "$IPA" ]]; then
+            echo "ERROR: Downloaded IPA was not found:" >&2
+            echo "$IPA" >&2
+
+            echo
+            echo "Files downloaded by GitHub:"
+            find .tmp/download-check -maxdepth 3 -type f -print
+
+            exit 1
+          fi
+
+          echo
+          echo "Downloaded file:"
+          ls -lh "$IPA"
+
+          echo
+          echo "Checking file type..."
+          file "$IPA"
+
+          echo
+          echo "Testing ZIP/IPA integrity..."
+          unzip -t "$IPA"
+
+          echo
+          echo "Comparing SHA-256 checksums..."
+
+          original="$(awk '{print $1}' /tmp/original-ipa.sha256)"
+          downloaded="$(shasum -a 256 "$IPA" | awk '{print $1}')"
+
+          echo "Original:   $original"
+          echo "Downloaded: $downloaded"
+
+          if [[ "$original" != "$downloaded" ]]; then
+            echo "ERROR: Downloaded IPA does not match the original IPA." >&2
+            exit 1
+          fi
+
+          echo
+          echo "Checking Payload structure..."
+
+          if ! unzip -l "$IPA" | grep -q "Payload/NotificationHistory.app/"; then
+            echo "ERROR: Payload/NotificationHistory.app/ was not found." >&2
+            exit 1
+          fi
+
+          if ! unzip -l "$IPA" | grep -q "Payload/NotificationHistory.app/Info.plist"; then
+            echo "ERROR: Info.plist was not found." >&2
+            exit 1
+          fi
+
+          echo
+          echo "Running custom validator..."
+
           python3 scripts/ipa_archive.py \
-            ".tmp/download-check/NotificationHistory-v${APP_VERSION}-ios-arm64.ipa" \
-            --report "artifacts/NotificationHistory-v${APP_VERSION}-ios-arm64.validation.json"
+            "$IPA" \
+            --report "artifacts/NotificationHistory-v${APP_VERSION}-ios-arm64.downloaded.validation.json"
+
+          echo
+          echo "Downloaded IPA is byte-for-byte identical to the original."
+
       - name: Upload validation report and signing information
         uses: actions/upload-artifact@v7
         with:
@@ -99,10 +294,13 @@ jobs:
           archive: true
           if-no-files-found: error
           retention-days: 14
+          compression-level: 6
           path: |
             artifacts/*.validation.json
             src/NotificationHistory/Platforms/iOS/Entitlements.plist
             native/Shared/Shared.entitlements
+
       - name: Clean temporary download check
         if: always()
-        run: rm -rf -- "$GITHUB_WORKSPACE/.tmp/download-check"
+        run: |
+          rm -rf -- "$GITHUB_WORKSPACE/.tmp/download-check"
