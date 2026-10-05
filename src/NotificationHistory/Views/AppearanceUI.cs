@@ -8,7 +8,7 @@ internal static class AppearanceUI
     {
         input.SetAppThemeColor(InputView.TextColorProperty, Color.FromArgb("#1C1C1E"), Colors.White);
         input.SetAppThemeColor(InputView.PlaceholderColorProperty, Color.FromArgb("#62626B"), Color.FromArgb("#A4A4AD"));
-        input.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#EAEAEE"), Color.FromArgb("#2C2C2E"));
+        input.BackgroundColor = Colors.Transparent;
     }
     public static void Foreground(Label label) => label.SetAppThemeColor(Label.TextColorProperty, Color.FromArgb("#1C1C1E"), Colors.White);
     public static Label Text(string value, double size = 15, bool bold = false)
@@ -35,10 +35,32 @@ internal static class AppearanceUI
     }
     public static Border ValueBox(View content, Thickness? padding = null)
     {
-        var box = new Border { Content = content, Padding = padding ?? new Thickness(14), MinimumHeightRequest = 52,
-            StrokeThickness = 1.5, StrokeShape = new RoundRectangle { CornerRadius = 12 } };
-        box.SetAppThemeColor(VisualElement.BackgroundColorProperty, Colors.White, Color.FromArgb("#202024"));
-        box.SetAppTheme<Brush>(Border.StrokeProperty, new SolidColorBrush(Color.FromArgb("#B7B7C2")), new SolidColorBrush(Color.FromArgb("#686873"))); return box;
+        return new Border { Style = (Style)Application.Current!.Resources["InputBorderStyle"], Content = content,
+            Padding = padding ?? new Thickness(14) };
+    }
+    public static Border EditField(InputView input, bool compact = false)
+    {
+        Input(input); input.MinimumHeightRequest = compact ? 36 : 44;
+        var box = ValueBox(input, new Thickness(compact ? 8 : 12, 4));
+        if (compact) box.MinimumHeightRequest = 44;
+        input.Focused += (_, _) =>
+        {
+            box.SetAppTheme<Brush>(Border.StrokeProperty, new SolidColorBrush(Color.FromArgb("#087E8B")), new SolidColorBrush(Color.FromArgb("#5EDCE1")));
+            box.StrokeThickness = 2;
+        };
+        input.Unfocused += (_, _) => { box.ClearValue(Border.StrokeProperty); box.ClearValue(Border.StrokeThicknessProperty); };
+        SemanticProperties.SetHint(input, "Editable " + (input.Placeholder ?? "value")); return box;
+    }
+    public static Border DateField(DatePicker picker)
+    {
+        picker.SetAppThemeColor(DatePicker.TextColorProperty, Color.FromArgb("#1C1C1E"), Colors.White);
+        picker.BackgroundColor = Colors.Transparent; picker.MinimumHeightRequest = 48;
+        var row = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, ColumnSpacing = 8 };
+        row.Add(picker);
+        var arrow = Text("⌄", 23, true); arrow.VerticalOptions = LayoutOptions.Center; arrow.InputTransparent = true; row.Add(arrow, 1);
+        var box = ValueBox(row, new Thickness(14, 4));
+        var tap = new TapGestureRecognizer(); tap.Tapped += (_, _) => picker.Focus(); box.GestureRecognizers.Add(tap);
+        SemanticProperties.SetHint(picker, "Tap to choose a date"); return box;
     }
     public static Border Selector(Picker picker)
     {
@@ -51,6 +73,11 @@ internal static class AppearanceUI
         var box = ValueBox(row, new Thickness(14, 4));
         var tap = new TapGestureRecognizer(); tap.Tapped += (_, _) => picker.Focus(); box.GestureRecognizers.Add(tap);
         SemanticProperties.SetHint(picker, "Tap to choose " + picker.Title.ToLowerInvariant()); return box;
+    }
+    public static void Swatch(Button button)
+    {
+        button.SetAppThemeColor(Microsoft.Maui.Controls.Button.BorderColorProperty, Color.FromArgb("#62626B"), Color.FromArgb("#B7B7C2"));
+        button.BorderWidth = 1.5;
     }
     public static Grid Header(Button left, string title, Button? right = null)
     {

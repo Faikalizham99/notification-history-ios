@@ -4,20 +4,30 @@
  x:Class="NotificationHistory.Views.NotificationsPage" x:DataType="vm:NotificationsViewModel" Title="Notification History">
  <ContentPage.ToolbarItems><ToolbarItem Text="Apps" Clicked="OnApps" /><ToolbarItem Text="Settings" Clicked="OnSettings" /></ContentPage.ToolbarItems>
  <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="16,8" RowSpacing="8">
-  <SearchBar Placeholder="Search your history" Text="{Binding Search}" TextChanged="OnSearch" />
+  <Border Style="{StaticResource InputBorderStyle}" Padding="0">
+   <SearchBar Placeholder="Search your history" Text="{Binding Search}" TextChanged="OnSearch" BackgroundColor="Transparent" />
+  </Border>
   <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
    <Button x:Name="FavoriteButton" Text="All" FontSize="13" Clicked="OnFavoriteFilter" />
    <Button x:Name="SourceButton" Grid.Column="1" Text="All apps" FontSize="13" LineBreakMode="TailTruncation" Clicked="OnSource" />
    <Button x:Name="DateButton" Grid.Column="2" Text="Any date" FontSize="13" Clicked="OnDate" />
   </Grid>
-  <DatePicker x:Name="FilterDate" Grid.Row="2" IsVisible="False" DateSelected="OnDateSelected" />
+  <Border x:Name="FilterDateField" Grid.Row="2" Style="{StaticResource InputBorderStyle}" Padding="14,4" IsVisible="False">
+   <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+    <DatePicker x:Name="FilterDate" DateSelected="OnDateSelected" BackgroundColor="Transparent" MinimumHeightRequest="48" TextColor="{AppThemeBinding Light=#1C1C1E, Dark=White}" />
+    <Label Grid.Column="1" Text="⌄" FontSize="23" VerticalOptions="Center" InputTransparent="True" />
+   </Grid>
+   <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnDateFieldTapped" /></Border.GestureRecognizers>
+  </Border>
   <RefreshView Grid.Row="3" x:Name="Refresh" Refreshing="OnRefresh">
-   <CollectionView ItemsSource="{Binding Groups}" IsGrouped="True" SelectionMode="Single" SelectionChanged="OnSelected"
+   <CollectionView ItemsSource="{Binding Groups}" IsGrouped="True" SelectionMode="None"
      RemainingItemsThreshold="12" RemainingItemsThresholdReached="OnLoadMore">
     <CollectionView.EmptyView><VerticalStackLayout Padding="24,60" Spacing="12"><Label Text="A little peace of mind" FontSize="24" HorizontalTextAlignment="Center" /><Label Text="Saved notifications will appear here. Set up a Shortcut to start capturing." HorizontalTextAlignment="Center" /></VerticalStackLayout></CollectionView.EmptyView>
     <CollectionView.GroupHeaderTemplate><DataTemplate x:DataType="vm:NotificationGroup"><Label Text="{Binding Title}" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#636366, Dark=#AEAEB2}" Padding="4,18,4,8" /></DataTemplate></CollectionView.GroupHeaderTemplate>
     <CollectionView.ItemTemplate><DataTemplate x:DataType="vm:NotificationCardModel">
-     <views:NotificationCardView Margin="0,0,0,12" />
+     <views:NotificationCardView Margin="0,0,0,12" SemanticProperties.Hint="Tap to open notification">
+      <views:NotificationCardView.GestureRecognizers><TapGestureRecognizer Tapped="OnCardTapped" /></views:NotificationCardView.GestureRecognizers>
+     </views:NotificationCardView>
     </DataTemplate></CollectionView.ItemTemplate>
    </CollectionView>
   </RefreshView>

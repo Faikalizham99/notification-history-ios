@@ -42,7 +42,11 @@ public sealed class DebugPage : ContentPage
             catch { await AppServices.AlertAsync("Insert failed", "Check shared storage."); }
         };
         link.Clicked += (_, _) => services.OpenLink($"notificationhistory://notification/{id}");
-        Content = new ScrollView { Content = new VerticalStackLayout { Padding = 24, Spacing = 12, Children = { source, title, subtitle, body, date, save, samples, link } } };
+        var stack = new VerticalStackLayout { Padding = 24, Spacing = 12 };
+        foreach (var (caption, input) in new (string, InputView)[] { ("SOURCE APP", source), ("TITLE", title), ("SUBTITLE", subtitle), ("MESSAGE", body) })
+        { stack.Add(AppearanceUI.Caption(caption)); stack.Add(AppearanceUI.EditField(input)); }
+        stack.Add(AppearanceUI.Caption("DATE")); stack.Add(AppearanceUI.DateField(date));
+        stack.Add(save); stack.Add(samples); stack.Add(link); Content = new ScrollView { Content = stack };
     }
 }
 #endif

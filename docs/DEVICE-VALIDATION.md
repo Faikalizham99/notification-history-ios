@@ -25,6 +25,7 @@ These checks need a signed build on an actual iOS 27 iPhone. They have not been 
 
 1. Use the Debug configuration’s Development tools to insert records for today, yesterday, and an older date. Confirm grouping, scrolling, detail navigation, individual-field copy, and full-notification copy.
 2. Search English, Malay, Chinese, emoji, an apostrophe, `%`, and `_`. Combine favorites, app, and date filters and reset them individually. Check that rapid typing does not show results for a previous query.
+   Hold a notification card and confirm no gray rectangular highlight appears, including the space below rounded card corners. Tap the same card repeatedly, navigate back, scroll, refresh, and load additional pages; detail navigation should happen once per tap. Check tappable Apps rows and read-only copy boxes also avoid a selection overlay.
    History cards show a provided subtitle between title and message. Check subtitle plus message, subtitle only, and null/empty/whitespace subtitles: missing subtitles must leave no blank row, and subtitle-only cards must show the subtitle once. Check the appearance preview uses the same layout.
 3. Favorite, unfavorite, delete, and clear. Return to the list and confirm the current state. Cancel the deletion confirmations and confirm no change.
    Confirm detail field captions sit above outlined read-only value boxes, empty fields show Not provided, and tapping any provided value or its Copy indicator copies the exact value. In Malaysia, the time must include actual hours/minutes/seconds and UTC+08:00, following the phone's time format. Check both 12- and 24-hour formats.
@@ -43,6 +44,7 @@ These checks need a signed build on an actual iOS 27 iPhone. They have not been 
 6. Check the smallest supported phone, landscape, large text, VoiceOver, long app names/messages, fixed Save/Cancel header, scrolling, and keyboard-safe color/source fields. Compare rounded/circular masks with the crop frame.
 7. Verify saved appearance on both widget sizes and captured records with the app closed. Profile changes must not alter stored notification content; widget reload timing is controlled by iOS.
 8. Select Light, Dark, then System in Settings. Check the Apps list, appearance editor, display/source inputs, shape picker, all hex fields, circular color picker, and photo/crop screens. Text, placeholders, backgrounds, and buttons must remain readable; System should respond to an iOS appearance change while a MAUI editor is open. Custom notification card colors should remain unchanged.
+9. Verify visible outlines on display/source names, icon shape, all five appearance hex values, color-wheel hex, swatches, Apps rows, history search/date filter, and development source/title/subtitle/message/date inputs. Focus an editable field and confirm its teal outline; unfocus and confirm the normal outline returns. Retention/theme selectors and notification detail copy boxes should use the same shared border style. Check long names, narrow screens, large text, and keyboard scrolling.
 
 ## Widget and deep links
 

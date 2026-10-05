@@ -49,7 +49,7 @@ public sealed class AppsPage : ContentPage
                 var name = AppearanceUI.Text(profile.DisplayName, 19, true); name.MaxLines = 1; name.LineBreakMode = LineBreakMode.TailTruncation;
                 labels.Add(name); labels.Add(AppearanceUI.Caption(saved.ContainsKey(profile.SourceKey) ? "Custom appearance" : "Choose photo & colors"));
                 grid.Add(labels, 1); var chevron = AppearanceUI.Caption("›"); chevron.VerticalOptions = LayoutOptions.Center; chevron.FontSize = 24; grid.Add(chevron, 2);
-                var row = AppearanceUI.Panel(grid);
+                var row = AppearanceUI.ValueBox(grid, new Thickness(16));
                 var tap = new TapGestureRecognizer(); tap.Tapped += async (_, _) => await OpenAsync(profile, saved.ContainsKey(profile.SourceKey)); row.GestureRecognizers.Add(tap);
                 SemanticProperties.SetDescription(row, "Edit appearance for " + profile.DisplayName); rows.Add(row);
             }

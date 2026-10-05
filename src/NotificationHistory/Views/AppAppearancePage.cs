@@ -30,10 +30,6 @@ public sealed class AppAppearancePage : ContentPage
     {
         this.services = services; draft = profile.Copy(); previousKey = saved ? profile.SourceKey : null;
         Title = "App Appearance"; AppearanceUI.Page(this); SafeAreaEdges = new(SafeAreaRegions.All);
-        AppearanceUI.Input(name); AppearanceUI.Input(source);
-        shape.SetAppThemeColor(Picker.TextColorProperty, Color.FromArgb("#1C1C1E"), Colors.White);
-        shape.SetAppThemeColor(Picker.TitleColorProperty, Color.FromArgb("#62626B"), Color.FromArgb("#A4A4AD"));
-        shape.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#EAEAEE"), Color.FromArgb("#2C2C2E"));
         NavigationPage.SetHasNavigationBar(this, false);
         var imagePath = services.Appearance.ImagePath(draft.ImageFile); icon = imagePath is null ? null : ImageSource.FromFile(imagePath);
         var stack = new VerticalStackLayout { Padding = new Thickness(20, 12, 20, 30), Spacing = 22 };
@@ -41,17 +37,19 @@ public sealed class AppAppearancePage : ContentPage
         save.BackgroundColor = Color.FromArgb("#087E8B"); save.TextColor = Colors.White; save.Clicked += OnSave;
         var heading = new Grid { ColumnDefinitions = { new(new GridLength(96)), new(GridLength.Star) }, ColumnSpacing = 18 };
         heroInitial.HorizontalTextAlignment = TextAlignment.Center; heroInitial.VerticalTextAlignment = TextAlignment.Center;
-        heading.Add(hero); name.Text = draft.DisplayName; name.TextChanged += (_, _) => { draft.DisplayName = name.Text ?? ""; Render(); }; heading.Add(name, 1);
+        heading.Add(hero); name.Text = draft.DisplayName; name.TextChanged += (_, _) => { draft.DisplayName = name.Text ?? ""; Render(); };
+        var nameField = new VerticalStackLayout { Spacing = 6, VerticalOptions = LayoutOptions.Center };
+        nameField.Add(AppearanceUI.Caption("DISPLAY NAME")); nameField.Add(AppearanceUI.EditField(name)); heading.Add(nameField, 1);
         stack.Add(heading); changeIcon.HorizontalOptions = LayoutOptions.Fill;
         changeIcon.Clicked += OnPickIcon; stack.Add(changeIcon); progress.IsVisible = false; stack.Add(progress);
         var iconActions = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star) }, ColumnSpacing = 10 };
         cropAgain.Clicked += OnCropAgain; removeIcon.Clicked += (_, _) => { originalBytes = croppedBytes = null; draft.ImageFile = draft.OriginalImageFile = null; icon = null; Render(); };
         iconActions.Add(cropAgain); iconActions.Add(removeIcon, 1); stack.Add(iconActions);
         shape.SelectedItem = draft.IconShape; shape.SelectedIndexChanged += (_, _) => { draft.IconShape = shape.SelectedItem as string ?? "Rounded"; Render(); };
-        stack.Add(AppearanceUI.Panel(shape));
+        stack.Add(AppearanceUI.Caption("ICON SHAPE")); stack.Add(AppearanceUI.Selector(shape));
         var sourcePanel = new VerticalStackLayout { Spacing = 6 };
         sourcePanel.Add(AppearanceUI.Caption("SOURCE APP")); source.Text = draft.SourceName; source.TextChanged += (_, _) => { draft.SourceName = source.Text ?? ""; };
-        sourcePanel.Add(source); sourcePanel.Add(AppearanceUI.Caption("Match the Source App value in your Save Notification Shortcut.")); stack.Add(AppearanceUI.Panel(sourcePanel));
+        sourcePanel.Add(AppearanceUI.EditField(source)); sourcePanel.Add(AppearanceUI.Caption("Match the Source App value in your Save Notification Shortcut.")); stack.Add(AppearanceUI.Panel(sourcePanel));
         var previewPanel = new VerticalStackLayout { Spacing = 10 };
         previewPanel.Add(AppearanceUI.Caption("NOTIFICATION PREVIEW")); previewPanel.Add(preview);
         previewPanel.Add(AppearanceUI.Caption("Your appearance applies to existing and new notifications from this source.")); stack.Add(previewPanel);
@@ -60,6 +58,7 @@ public sealed class AppAppearancePage : ContentPage
             ("Blue", "#282D80", "#39277F"), ("Orange", "#874019", "#BA601E"), ("Charcoal", "#242426", "#171719") })
         {
             var swatch = AppearanceUI.Button(" "); swatch.WidthRequest = swatch.HeightRequest = 40; swatch.Padding = 0; swatch.BackgroundColor = Color.FromArgb(first);
+            AppearanceUI.Swatch(swatch);
             SemanticProperties.SetDescription(swatch, label + " color preset");
             swatch.Clicked += (_, _) => { draft.BackgroundColor = first; draft.GradientColor = second; draft.AutoTextColor = true; draft.UseGradient = true; UpdateFields(); }; palette.Add(swatch);
         }
@@ -185,7 +184,7 @@ public sealed class AppAppearancePage : ContentPage
         public ColorField(ContentPage owner, string title, string initial, Action<string> changed)
         {
             this.changed = changed; current = initial;
-            View = new Grid { ColumnDefinitions = { new(GridLength.Star), new(new GridLength(98)), new(new GridLength(44)) }, ColumnSpacing = 8 };
+            View = new Grid { ColumnDefinitions = { new(GridLength.Star), new(new GridLength(116)), new(new GridLength(44)) }, ColumnSpacing = 8 };
             var label = AppearanceUI.Text(title, 14); label.VerticalOptions = LayoutOptions.Center; View.Add(label);
             hex = new Entry { Text = initial, MaxLength = 7, FontSize = 14, FontFamily = "Menlo", HorizontalTextAlignment = TextAlignment.End };
             AppearanceUI.Input(hex);
@@ -193,8 +192,9 @@ public sealed class AppAppearancePage : ContentPage
             {
                 if (AppearanceColors.TryNormalize(hex.Text, out var value)) { current = value; swatch!.BackgroundColor = Color.FromArgb(value); AppearanceUI.Input(hex); changed(value); }
                 else hex.SetAppThemeColor(InputView.TextColorProperty, Color.FromArgb("#B42323"), Color.FromArgb("#FF8A8A"));
-            }; View.Add(hex, 1);
+            }; View.Add(AppearanceUI.EditField(hex, true), 1);
             swatch = AppearanceUI.Button(" "); swatch.HeightRequest = 40; swatch.CornerRadius = 20; swatch.Padding = 0; swatch.BackgroundColor = Color.FromArgb(initial);
+            AppearanceUI.Swatch(swatch);
             SemanticProperties.SetDescription(swatch, "Choose " + title.ToLowerInvariant() + " color");
             swatch.Clicked += async (_, _) =>
             {

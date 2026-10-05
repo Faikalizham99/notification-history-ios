@@ -46,7 +46,8 @@ public sealed class ColorWheelPage : ContentPage
         };
         sample = AppearanceUI.Panel(new Label { Text = "Selected color", HorizontalTextAlignment = TextAlignment.Center }, new Thickness(18));
         var stack = new VerticalStackLayout { Padding = new Thickness(24, 12, 24, 24), Spacing = 18 };
-        stack.Add(brightnessLabel); stack.Add(brightness); stack.Add(sample); stack.Add(hex);
+        stack.Add(brightnessLabel); stack.Add(brightness); stack.Add(sample);
+        stack.Add(AppearanceUI.Caption("HEX COLOR")); stack.Add(AppearanceUI.EditField(hex));
         stack.Add(AppearanceUI.Caption("The notification preview updates while you choose. Cancel restores the previous color."));
         // Keep the wheel outside the ScrollView so a vertical color drag cannot turn into page scrolling.
         var layout = new Grid { RowDefinitions = { new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Star), new(GridLength.Star) }, RowSpacing = 10 };

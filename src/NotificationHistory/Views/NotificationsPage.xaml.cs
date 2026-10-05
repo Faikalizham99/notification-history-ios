@@ -8,6 +8,7 @@ public partial class NotificationsPage : ContentPage
     private readonly AppServices services;
     private readonly NotificationsViewModel vm;
     private bool initializingDate;
+    private bool openingNotification;
     public NotificationsPage(AppServices services) { InitializeComponent(); this.services = services; vm = new(services); BindingContext = vm; }
     protected override async void OnAppearing()
     {
@@ -30,9 +31,12 @@ public partial class NotificationsPage : ContentPage
         finally { Refresh.IsRefreshing = false; }
     }
     private async void OnLoadMore(object? sender, EventArgs e) { if (vm is not null) await vm.LoadMoreAsync(); }
-    private async void OnSelected(object? sender, SelectionChangedEventArgs e)
+    private async void OnCardTapped(object? sender, TappedEventArgs e)
     {
-        if (e.CurrentSelection.FirstOrDefault() is NotificationCardModel card) { ((CollectionView)sender!).SelectedItem = null; await services.OpenDetailAsync(card.Entry.Id); }
+        if (openingNotification || sender is not View { BindingContext: NotificationCardModel card }) return;
+        openingNotification = true;
+        try { await services.OpenDetailAsync(card.Entry.Id); }
+        finally { openingNotification = false; }
     }
     private async void OnFavoriteFilter(object? sender, EventArgs e) { vm.Favorites = !vm.Favorites; FavoriteButton.Text = vm.Favorites ? "★ Favorites" : "All"; await vm.ReloadAsync(); }
     private async void OnSource(object? sender, EventArgs e)
@@ -48,9 +52,10 @@ public partial class NotificationsPage : ContentPage
     }
     private async void OnDate(object? sender, EventArgs e)
     {
-        if (FilterDate.IsVisible) { FilterDate.IsVisible = false; vm.Date = null; DateButton.Text = "Any date"; await vm.ReloadAsync(); }
-        else { initializingDate = true; FilterDate.Date = DateTime.Today; initializingDate = false; FilterDate.IsVisible = true; vm.Date = DateTime.Today; DateButton.Text = "Clear date"; await vm.ReloadAsync(); }
+        if (FilterDateField.IsVisible) { FilterDateField.IsVisible = false; vm.Date = null; DateButton.Text = "Any date"; await vm.ReloadAsync(); }
+        else { initializingDate = true; FilterDate.Date = DateTime.Today; initializingDate = false; FilterDateField.IsVisible = true; vm.Date = DateTime.Today; DateButton.Text = "Clear date"; await vm.ReloadAsync(); }
     }
+    private void OnDateFieldTapped(object? sender, TappedEventArgs e) => FilterDate.Focus();
     private async void OnDateSelected(object? sender, DateChangedEventArgs e) { if (vm is not null && !initializingDate) { vm.Date = e.NewDate; await vm.ReloadAsync(); } }
     private async void OnSetup(object? sender, EventArgs e) => await Navigation.PushAsync(new OnboardingPage(services));
     private async void OnApps(object? sender, EventArgs e) => await Navigation.PushAsync(new AppsPage(services));

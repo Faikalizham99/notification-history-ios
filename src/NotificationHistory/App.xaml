@@ -5,5 +5,13 @@
   <Style TargetType="Label"><Setter Property="TextColor" Value="{AppThemeBinding Light=#1C1C1E, Dark=#FFFFFF}" /></Style>
   <Style TargetType="Button"><Setter Property="BackgroundColor" Value="#087E8B" /><Setter Property="TextColor" Value="White" /><Setter Property="CornerRadius" Value="12" /><Setter Property="Padding" Value="16,12" /></Style>
   <Style TargetType="SearchBar"><Setter Property="TextColor" Value="{AppThemeBinding Light=#1C1C1E, Dark=White}" /></Style>
+  <Style TargetType="CollectionView"><Setter Property="SelectionMode" Value="None" /></Style>
+  <Style x:Key="InputBorderStyle" TargetType="Border">
+   <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=White, Dark=#202024}" />
+   <Setter Property="Stroke" Value="{AppThemeBinding Light=#B7B7C2, Dark=#686873}" />
+   <Setter Property="StrokeThickness" Value="1.5" /><Setter Property="MinimumHeightRequest" Value="52" />
+   <Setter Property="Padding" Value="14" />
+   <Setter Property="StrokeShape"><Setter.Value><RoundRectangle CornerRadius="12" /></Setter.Value></Setter>
+  </Style>
  </Application.Resources>
 </Application>
