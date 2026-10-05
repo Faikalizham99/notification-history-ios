@@ -118,7 +118,7 @@ public sealed class AppAppearancePage : ContentPage
     {
         if (updating) return;
         var previewProfile = draft.Copy(); if (string.IsNullOrWhiteSpace(previewProfile.DisplayName)) previewProfile.DisplayName = "Your app";
-        var example = new NotificationEntry { SourceApp = draft.SourceName, Title = "Sample notification",
+        var example = new NotificationEntry { SourceApp = draft.SourceName, Title = "Sample notification", Subtitle = "Example subtitle",
             Body = "Your messages will appear here. Make this card feel like your app.", ReceivedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() };
         preview.BindingContext = new NotificationCardModel(example, previewProfile, icon);
         hero.BackgroundColor = Color.FromArgb(draft.BackgroundColor); hero.StrokeShape = new RoundRectangle { CornerRadius = draft.IconShape == "Circle" ? 48 : 24 };

@@ -27,7 +27,7 @@ public sealed class NotificationCardView : ContentView
                 TextColor = titleColor, HorizontalTextAlignment = TextAlignment.Center, VerticalTextAlignment = TextAlignment.Center };
         SemanticProperties.SetDescription(icon, profile.DisplayName + " icon");
         grid.Add(icon);
-        var text = new Grid { RowDefinitions = { new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Auto) }, RowSpacing = 4 };
+        var text = new VerticalStackLayout { Spacing = 4 };
         var heading = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, ColumnSpacing = 8 };
         heading.Add(new Label { Text = profile.DisplayName.ToUpperInvariant(), FontSize = 15, TextColor = titleColor,
             MaxLines = 1, LineBreakMode = LineBreakMode.TailTruncation, AutomationId = "CardAppName" });
@@ -35,9 +35,15 @@ public sealed class NotificationCardView : ContentView
             FontSize = 12, TextColor = timeColor, VerticalOptions = LayoutOptions.Center, AutomationId = "CardTime" }, 1);
         text.Add(heading);
         text.Add(new Label { Text = card.Entry.TitleDisplay, FontSize = 17, FontAttributes = FontAttributes.Bold,
-            TextColor = titleColor, MaxLines = 2, LineBreakMode = LineBreakMode.TailTruncation, AutomationId = "CardTitle" }, 0, 1);
-        text.Add(new Label { Text = card.Entry.Preview, FontSize = 16, TextColor = bodyColor, MaxLines = 3,
-            LineBreakMode = LineBreakMode.TailTruncation, AutomationId = "CardMessage" }, 0, 2);
+            TextColor = titleColor, MaxLines = 2, LineBreakMode = LineBreakMode.TailTruncation, AutomationId = "CardTitle" });
+        var hasSubtitle = !string.IsNullOrWhiteSpace(card.Entry.Subtitle);
+        if (hasSubtitle)
+            text.Add(new Label { Text = card.Entry.Subtitle, FontSize = 15, TextColor = bodyColor, MaxLines = 2,
+                LineBreakMode = LineBreakMode.TailTruncation, AutomationId = "CardSubtitle" });
+        // Preview falls back to the subtitle for other consumers; don't repeat it on this card.
+        if (!string.IsNullOrWhiteSpace(card.Entry.Body) || !hasSubtitle)
+            text.Add(new Label { Text = card.Entry.Preview, FontSize = 16, TextColor = bodyColor, MaxLines = 3,
+                LineBreakMode = LineBreakMode.TailTruncation, AutomationId = "CardMessage" });
         grid.Add(text, 1);
         Content = new Border { Padding = 14, StrokeThickness = 0, Background = background,
             StrokeShape = new RoundRectangle { CornerRadius = 20 }, Content = grid };
