@@ -23,11 +23,16 @@ public partial class NotificationsPage : ContentPage
         }
         catch (Exception error) { await AppServices.StorageAlertAsync(error, "Storage unavailable", "Check App Group signing and free space on the device."); }
     }
-    protected override void OnDisappearing() { CloseSwipe(); services.Changed -= OnChanged; base.OnDisappearing(); }
+    protected override void OnDisappearing() { HistorySearch.Unfocus(); CloseSwipe(); services.Changed -= OnChanged; base.OnDisappearing(); }
     private async Task ReloadAsync(bool debounce = false) { CloseSwipe(); await vm.ReloadAsync(debounce); }
     private void OnChanged(object? sender, EventArgs e) => MainThread.BeginInvokeOnMainThread(async () => await ReloadAsync());
-    private async void OnSearch(object? sender, TextChangedEventArgs e) { if (vm is not null) { vm.Search = e.NewTextValue; await ReloadAsync(true); } }
+    private async void OnSearch(object? sender, TextChangedEventArgs e)
+    { if (vm is not null) { UpdateSearchControls(); vm.Search = e.NewTextValue; await ReloadAsync(true); } }
     private void OnSearchFieldTapped(object? sender, TappedEventArgs e) => HistorySearch.Focus();
+    private void UpdateSearchControls() => SearchCancel.IsVisible = HistorySearch.IsFocused || !string.IsNullOrEmpty(HistorySearch.Text);
+    private void OnSearchFocusChanged(object? sender, FocusEventArgs e) => UpdateSearchControls();
+    private void OnSearchCompleted(object? sender, EventArgs e) => HistorySearch.Unfocus();
+    private void OnCancelSearch(object? sender, EventArgs e) { HistorySearch.Text = ""; HistorySearch.Unfocus(); UpdateSearchControls(); }
     private async void OnRefresh(object? sender, EventArgs e)
     {
         try { await services.Database.CleanupAsync(); await ReloadAsync(); }

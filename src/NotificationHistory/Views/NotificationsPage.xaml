@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
  xmlns:vm="clr-namespace:NotificationHistory.ViewModels" xmlns:views="clr-namespace:NotificationHistory.Views"
- x:Class="NotificationHistory.Views.NotificationsPage" x:DataType="vm:NotificationsViewModel" Title="Notification History">
+ x:Class="NotificationHistory.Views.NotificationsPage" x:DataType="vm:NotificationsViewModel" Title="Notification History" HideSoftInputOnTapped="True">
  <ContentPage.ToolbarItems><ToolbarItem Text="Apps" Clicked="OnApps" /><ToolbarItem Text="Settings" Clicked="OnSettings" /></ContentPage.ToolbarItems>
  <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Padding="16,8" RowSpacing="8">
+  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
   <Border Style="{StaticResource InputBorderStyle}" Padding="14,4">
    <Grid ColumnDefinitions="20,*" ColumnSpacing="10">
     <Grid WidthRequest="20" HeightRequest="20" VerticalOptions="Center" InputTransparent="True">
@@ -15,10 +16,14 @@
     <Entry x:Name="HistorySearch" Grid.Column="1" Placeholder="Search your history" Text="{Binding Search}" TextChanged="OnSearch"
       BackgroundColor="Transparent" TextColor="{AppThemeBinding Light=#1C1C1E, Dark=White}"
       PlaceholderColor="{AppThemeBinding Light=#62626B, Dark=#A4A4AD}" MinimumHeightRequest="44"
-      ReturnType="Search" ClearButtonVisibility="WhileEditing" SemanticProperties.Description="Search notification history" />
+      ReturnType="Search" Completed="OnSearchCompleted" Focused="OnSearchFocusChanged" Unfocused="OnSearchFocusChanged"
+      ClearButtonVisibility="WhileEditing" SemanticProperties.Description="Search notification history" />
    </Grid>
    <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnSearchFieldTapped" /></Border.GestureRecognizers>
   </Border>
+   <Button x:Name="SearchCancel" Grid.Column="1" Text="Cancel" FontSize="14" Padding="10,8" MinimumHeightRequest="44"
+     IsVisible="False" Clicked="OnCancelSearch" SemanticProperties.Hint="Clears the search and closes the keyboard." />
+  </Grid>
   <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
    <Button x:Name="FavoriteButton" Text="All" FontSize="13" Clicked="OnFavoriteFilter" />
    <Button x:Name="SourceButton" Grid.Column="1" Text="{Binding SelectedAppName}" FontSize="13" LineBreakMode="TailTruncation" Clicked="OnSource" />
