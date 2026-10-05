@@ -39,11 +39,13 @@ struct CapturedNotification: Sendable {
 }
 
 enum HistoryError: LocalizedError {
-    case unavailable, database, newerSchema
+    case unavailable, database, newerSchema, sqlite(Int32), lockTimedOut, lockFailed(Int32)
     var errorDescription: String? {
         switch self {
         case .unavailable: "Shared history is unavailable. Check App Group signing and unlock the device once after restart."
-        case .database: "History could not be saved or read. Check free storage and try again."
+        case .database, .sqlite: "History could not be saved or read. Check free storage and try again."
+        case .lockTimedOut: "History is busy. Please try again shortly."
+        case .lockFailed: "Could not access the shared history lock. Check device storage and signing."
         case .newerSchema: "Update Notification History to access this database."
         }
     }
@@ -81,7 +83,8 @@ final class SharedDatabase {
         iconDirectory = file.deletingLastPathComponent().appendingPathComponent("Icons", isDirectory: true)
         let flags = (readOnly ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE) | SQLITE_OPEN_FULLMUTEX
         guard sqlite3_open_v2(file.path, &handle, flags, nil) == SQLITE_OK else {
-            if let handle { sqlite3_close(handle) }; handle = nil; throw HistoryError.unavailable
+            let failure = databaseError()
+            if let handle { sqlite3_close(handle) }; handle = nil; throw failure
         }
         do {
             sqlite3_busy_timeout(handle, 5000)
@@ -107,19 +110,23 @@ final class SharedDatabase {
         } catch { sqlite3_close(handle); handle = nil; throw error }
     }
     deinit { if let handle { sqlite3_close(handle) }; writerLock = nil }
+    private func databaseError() -> HistoryError {
+        guard let handle else { return .unavailable }
+        return .sqlite(sqlite3_extended_errcode(handle))
+    }
     private func exec(_ sql: String) throws {
-        guard sqlite3_exec(handle, sql, nil, nil, nil) == SQLITE_OK else { throw HistoryError.database }
+        guard sqlite3_exec(handle, sql, nil, nil, nil) == SQLITE_OK else { throw databaseError() }
     }
     private func prepare(_ sql: String) throws -> OpaquePointer {
         var statement: OpaquePointer?
-        guard sqlite3_prepare_v2(handle, sql, -1, &statement, nil) == SQLITE_OK, let statement else { throw HistoryError.database }
+        guard sqlite3_prepare_v2(handle, sql, -1, &statement, nil) == SQLITE_OK, let statement else { throw databaseError() }
         return statement
     }
     private func bind(_ value: String?, to statement: OpaquePointer, at index: Int32) throws {
         let result: Int32
         if let value { result = value.withCString { sqlite3_bind_text(statement, index, $0, Int32(value.utf8.count), transient) } }
         else { result = sqlite3_bind_null(statement, index) }
-        guard result == SQLITE_OK else { throw HistoryError.database }
+        guard result == SQLITE_OK else { throw HistoryError.sqlite(result) }
     }
     private func text(_ statement: OpaquePointer, _ column: Int32) -> String? {
         guard sqlite3_column_type(statement, column) != SQLITE_NULL, let pointer = sqlite3_column_text(statement, column) else { return nil }
@@ -127,12 +134,12 @@ final class SharedDatabase {
     }
     private func scalar(_ sql: String) throws -> Int64 {
         let statement = try prepare(sql); defer { sqlite3_finalize(statement) }
-        guard sqlite3_step(statement) == SQLITE_ROW else { throw HistoryError.database }
+        guard sqlite3_step(statement) == SQLITE_ROW else { throw databaseError() }
         return sqlite3_column_int64(statement, 0)
     }
     private func textScalar(_ sql: String) throws -> String? {
         let statement = try prepare(sql); defer { sqlite3_finalize(statement) }
-        guard sqlite3_step(statement) == SQLITE_ROW else { throw HistoryError.database }
+        guard sqlite3_step(statement) == SQLITE_ROW else { throw databaseError() }
         return text(statement, 0)
     }
     func save(source: String?, title: String?, subtitle: String?, body: String?, receivedAt: Date? = nil, captureID: String? = nil) throws -> Int64 {
@@ -145,12 +152,12 @@ final class SharedDatabase {
             try bind(subtitle, to: statement, at: 3); try bind(body, to: statement, at: 4)
             sqlite3_bind_int64(statement, 5, Int64((receivedAt ?? Date()).timeIntervalSince1970 * 1000))
             sqlite3_bind_int64(statement, 6, now); try bind(captureID, to: statement, at: 7)
-            guard sqlite3_step(statement) == SQLITE_DONE else { throw HistoryError.database }
+            guard sqlite3_step(statement) == SQLITE_DONE else { throw databaseError() }
             var id = sqlite3_last_insert_rowid(handle)
             if let captureID {
                 let lookup = try prepare("SELECT Id FROM Notifications WHERE CaptureId=?"); defer { sqlite3_finalize(lookup) }
                 try bind(captureID, to: lookup, at: 1)
-                guard sqlite3_step(lookup) == SQLITE_ROW else { throw HistoryError.database }
+                guard sqlite3_step(lookup) == SQLITE_ROW else { throw databaseError() }
                 id = sqlite3_column_int64(lookup, 0)
             }
             let days = Int(try textScalar("SELECT COALESCE((SELECT Value FROM Settings WHERE Key='retention'),'0')") ?? "0") ?? 0
@@ -180,7 +187,7 @@ final class SharedDatabase {
                 rows.append(CapturedNotification(id: sqlite3_column_int64(statement, 0), source: source, title: text(statement, 2), subtitle: text(statement, 3), body: text(statement, 4), receivedAt: sqlite3_column_int64(statement, 5), appearance: try appearance(for: text(statement, 6))))
                 status = sqlite3_step(statement)
             }
-            guard status == SQLITE_DONE else { throw HistoryError.database }
+            guard status == SQLITE_DONE else { throw databaseError() }
             try exec("COMMIT"); return (count, rows)
         } catch { try? exec("ROLLBACK"); throw error }
     }
@@ -191,7 +198,7 @@ final class SharedDatabase {
         try bind(source.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(), to: statement, at: 1)
         let result = sqlite3_step(statement)
         if result == SQLITE_DONE { return nil }
-        guard result == SQLITE_ROW else { throw HistoryError.database }
+        guard result == SQLITE_ROW else { throw databaseError() }
         var imagePath: String?
         if let file = text(statement, 7), file.count == 41, file.hasSuffix("-icon.png"),
            file.prefix(32).allSatisfy({ $0.isHexDigit }), let directory = iconDirectory {

@@ -10,6 +10,7 @@ dotnet run --project "$root/tests/NotificationHistory.Tests" -c Release -- --see
 xcrun swiftc -parse-as-library "$root/native/Shared/SharedDatabase.swift" \
   "$root/native/Shared/SharedWriterLock.swift" \
   "$root/native/Shared/SignedAppGroups.swift" \
+  "$root/native/NotificationHistoryIntents/CaptureDiagnostics.swift" \
   "$root/tests/NativeStorageTests.swift" -o "$testdir/native-storage-tests" -lsqlite3
 "$testdir/native-storage-tests" --verify-signing "$testdir/signing"
 dotnet run --project "$root/tests/NotificationHistory.Tests" -c Release --no-build -- --seed-legacy-shared "$testdir/legacy.sqlite3"

@@ -60,6 +60,8 @@ These checks need a signed build on an actual iOS 27 iPhone. They have not been 
 
 ## Failure and concurrency
 
+1. After installing this version, run Save Notification with typed values and verify **Settings → Capture diagnostics** shows a Saved attempt ending at Action ready to return success. Repeat through the real automation for text, document, and photo notifications, foregrounded, backgrounded, and locked after first unlock. Following a Shortcuts error, refresh diagnostics and compare its local timestamp. Copy the report before clearing it. Do not infer a single cause from a missing record or unfinished attempt; note whether the corresponding notification was saved.
+   Verify copied reports contain no message text, source app, sender, file name/path, or caller Capture ID. Compare failure stages and error codes. Clear diagnostics and ensure history, settings, and icons remain. Test Light/Dark/System and large text. A missing or unwritable diagnostic directory must not prevent a successful save. Native diagnostics and signed-device execution have not been validated in the Windows workspace.
 1. Trigger bursts while refreshing history and while the widget reads. Confirm no missing independent entries or duplicate event tokens.
 2. Force-close the app during writes, reopen, and verify integrity through the storage test harness or a debugger using synthetic data. Do not delete SQLite sidecars to “recover” a database.
 3. Test low storage, revoked/mismatched App Group entitlements, removed extension, and future schema versions. Errors should surface without silently switching to a separate database.

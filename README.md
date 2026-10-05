@@ -78,6 +78,12 @@ Source, title, subtitle, and body are nullable. Empty records receive honest fal
 
 Identical text is never discarded. An optional **Capture ID** provides transactional retry idempotence only when the caller actually has a unique event identifier. Leave it blank otherwise. Received At is also optional; absent an original timestamp, capture time is used.
 
+## Capture diagnostics
+
+For intermittent Shortcut failures, open **Settings → Capture diagnostics** after an error and tap **Refresh**. Compare the time with the failed automation, then use **Copy diagnostics** to copy a report. The page shows the latest 50 native action attempts, the last execution stage, whether the database write committed, and categorized error codes. Times on screen follow the device time zone; copied reports use UTC. An unfinished attempt may still be running, may have been interrupted, or may have failed to update its diagnostic file. A saved attempt means the write completed; it does not prove Shortcuts received the final response, or that retention/deletion kept the notification afterward. No matching record is inconclusive: the extension may not have started, input resolution may have failed, or diagnostics storage may have been unavailable.
+
+Diagnostics contain random attempt IDs, timestamps, stages, save status, and numeric error codes. They exclude notification content, source app names, sender names, filenames, Capture IDs, arbitrary error descriptions, and file paths. Records remain local in the protected, backup-excluded App Group and are separate from SQLite, so a database error can still be inspected. Diagnostic writes are best effort and never replace a successful capture with an error. The native action also writes the same metadata to the system log. Older records are pruned beyond 50; attempts from the last five minutes are temporarily retained to avoid removing recent actions. **Clear diagnostics** removes diagnostic records without clearing history. Active actions may write a record again. Captures are not automatically retried, since startup failures cannot be retried inside an action that never runs, and blindly repeating an automation could duplicate saved entries.
+
 ## Project structure
 
 | Path | Responsibility |

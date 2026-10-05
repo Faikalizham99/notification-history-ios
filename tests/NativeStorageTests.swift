@@ -38,6 +38,33 @@ struct NativeStorageTests {
         }
         let file = URL(fileURLWithPath: CommandLine.arguments[1])
         let schema = URL(fileURLWithPath: CommandLine.arguments[2])
+        let diagnosticDirectory = file.deletingLastPathComponent().appendingPathComponent("capture-diagnostics-" + UUID().uuidString, isDirectory: true)
+        let trace = CaptureTrace(testingDirectory: diagnosticDirectory)
+        trace.mark("opening_storage")
+        trace.fail(HistoryError.sqlite(5))
+        let diagnosticFiles = try FileManager.default.contentsOfDirectory(at: diagnosticDirectory, includingPropertiesForKeys: nil)
+        let diagnosticData = try Data(contentsOf: diagnosticFiles.max(by: {
+            ((try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) <
+            ((try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast)
+        })!)
+        let diagnostic = try JSONSerialization.jsonObject(with: diagnosticData) as! [String: Any]
+        guard diagnostic["stage"] as? String == "opening_storage", diagnostic["outcome"] as? String == "failed",
+              diagnostic["errorCode"] as? String == "sqlite_error", diagnostic["platformCode"] as? Int == 5,
+              diagnostic["saved"] as? Bool == false,
+              Set(diagnostic.keys).isSubset(of: ["schema", "id", "startedAt", "updatedAt", "stage", "outcome", "saved", "errorCode", "platformCode"]) else {
+            fatalError("Native diagnostics do not preserve metadata-only failure status")
+        }
+        print("PASS native capture diagnostics record stages and numeric errors without content")
+        trace.mark("saved"); trace.mark("completed")
+        let savedDiagnostic = try JSONSerialization.jsonObject(with: Data(contentsOf: diagnosticFiles[0])) as! [String: Any]
+        guard savedDiagnostic["saved"] as? Bool == true, savedDiagnostic["outcome"] as? String == "saved",
+              savedDiagnostic["stage"] as? String == "completed" else { fatalError("Native diagnostics do not recognize a committed save") }
+        let blockedPath = file.deletingLastPathComponent().appendingPathComponent("diagnostics-blocked-" + UUID().uuidString)
+        try Data("Unrelated file".utf8).write(to: blockedPath)
+        let unavailableTrace = CaptureTrace(testingDirectory: blockedPath)
+        unavailableTrace.mark("saved"); unavailableTrace.mark("completed")
+        guard try String(contentsOf: blockedPath, encoding: .utf8) == "Unrelated file" else { fatalError("Diagnostics replaced an unrelated file") }
+        print("PASS native diagnostic failures cannot throw or overwrite unrelated files")
         if CommandLine.arguments.count == 4 && CommandLine.arguments[3] == "--verify-legacy" {
             let old = try SharedDatabase(readOnly: true, testingPath: file).snapshot()
             guard old.recent.count == 1, old.recent.first?.body == "Legacy message", old.recent.first?.appearance == nil else {

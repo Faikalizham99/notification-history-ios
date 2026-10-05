@@ -23,14 +23,28 @@ struct SaveNotificationIntent: AppIntent {
         }
     }
     func perform() async throws -> some IntentResult & ReturnsValue<Int> {
+        let trace = CaptureTrace()
         let source = sourceApp, title = notificationTitle, sub = subtitle, body = message, date = receivedAt
         // Empty Capture ID means no deduplication, rather than merging every blank ID.
         let token = captureID.flatMap { $0.isEmpty ? nil : $0 }
-        let id = try await Task.detached(priority: .userInitiated) {
-            try SharedDatabase().save(source: source, title: title, subtitle: sub, body: body, receivedAt: date, captureID: token)
-        }.value
-        WidgetCenter.shared.reloadAllTimelines()
-        return .result(value: Int(id))
+        do {
+            let id = try await Task.detached(priority: .userInitiated) {
+                trace.mark("opening_storage")
+                let database = try SharedDatabase()
+                trace.mark("storage_opened")
+                trace.mark("saving")
+                let id = try database.save(source: source, title: title, subtitle: sub, body: body, receivedAt: date, captureID: token)
+                trace.mark("saved")
+                return id
+            }.value
+            trace.mark("requesting_widget_refresh")
+            WidgetCenter.shared.reloadAllTimelines()
+            trace.mark("completed")
+            return .result(value: Int(id))
+        } catch {
+            trace.fail(error)
+            throw error
+        }
     }
 }
 
