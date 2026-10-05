@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using NotificationHistory.Core.Models;
+using NotificationHistory.Core.Services;
 using NotificationHistory.Services;
 namespace NotificationHistory.ViewModels;
 
@@ -7,16 +8,24 @@ public sealed class NotificationGroup(string title) : ObservableCollection<Notif
 public sealed class NotificationsViewModel(AppServices services) : ObservableViewModel
 {
     public ObservableCollection<NotificationGroup> Groups { get; } = [];
+    public ObservableCollection<AppBadgeModel> AppBadges { get; } = [];
     private CancellationTokenSource? searchCancellation;
     private readonly SemaphoreSlim loading = new(1, 1);
     private PageCursor? cursor;
     private bool more = true, busy;
     private int generation;
+    private bool appSelectionInitialized;
+    private string? selectedAppKey;
     private Dictionary<string, AppProfile> profiles = new(StringComparer.Ordinal);
     public bool Busy { get => busy; private set => Set(ref busy, value); }
     public string Search { get; set; } = "";
     public bool Favorites { get; set; }
-    public string? Source { get; set; }
+    public string SelectedAppName => AppBadges.FirstOrDefault(b => b.SourceKey == selectedAppKey)?.DisplayName ?? "All apps";
+    public bool HasAppBadges => AppBadges.Count > 0;
+    public string EmptyMessage => !HasAppBadges
+        ? "Saved notifications will appear here. Set up a Shortcut to start capturing."
+        : selectedAppKey is null ? "No notifications match these filters. Try changing your search, favorites, or date."
+        : $"No notifications match for {SelectedAppName}. Try changing your filters, or capture a notification through your Shortcut.";
     public DateTime? Date { get; set; }
     public async Task ReloadAsync(bool debounce = false)
     {
@@ -30,7 +39,11 @@ public sealed class NotificationsViewModel(AppServices services) : ObservableVie
             try
             {
                 Busy = true;
-                profiles = (await services.Appearance.LoadAsync()).ToDictionary(p => p.SourceKey, StringComparer.Ordinal);
+                var savedProfiles = await services.Appearance.LoadAsync();
+                var counts = await services.Database.SourceCountsAsync(token);
+                if (current != generation) return;
+                profiles = savedProfiles.ToDictionary(p => p.SourceKey, StringComparer.Ordinal);
+                UpdateBadges(AppBadgeCatalog.Build(savedProfiles, counts));
                 var rows = await services.Database.QueryAsync(Filter(), token: token);
                 if (current != generation) return;
                 Groups.Clear(); cursor = null; more = true; Append(rows);
@@ -56,7 +69,39 @@ public sealed class NotificationsViewModel(AppServices services) : ObservableVie
             from = new DateTimeOffset(DateTime.SpecifyKind(date.Date, DateTimeKind.Local)).ToUnixTimeMilliseconds();
             to = new DateTimeOffset(DateTime.SpecifyKind(date.Date.AddDays(1), DateTimeKind.Local)).ToUnixTimeMilliseconds();
         }
-        return new(Search, Favorites, Source, from, to);
+        var selected = AppBadges.FirstOrDefault(b => b.SourceKey == selectedAppKey);
+        return new(Search, Favorites, From: from, To: to, Sources: selected?.Data.Sources);
+    }
+    public void SelectApp(string? key)
+    {
+        selectedAppKey = key; appSelectionInitialized = true;
+        foreach (var badge in AppBadges) badge.IsSelected = badge.SourceKey == selectedAppKey;
+        Raise(nameof(SelectedAppName)); Raise(nameof(EmptyMessage));
+    }
+    private void UpdateBadges(List<AppBadgeData> catalog)
+    {
+        var keys = catalog.Select(b => b.Profile.SourceKey).ToHashSet(StringComparer.Ordinal);
+        for (var i = AppBadges.Count - 1; i >= 0; i--)
+            if (!keys.Contains(AppBadges[i].SourceKey)) AppBadges.RemoveAt(i);
+        for (var i = 0; i < catalog.Count; i++)
+        {
+            var data = catalog[i]; var image = services.Appearance.ImagePath(data.Profile.ImageFile);
+            var icon = image is null ? null : ImageSource.FromFile(image);
+            var badge = AppBadges.FirstOrDefault(b => b.SourceKey == data.Profile.SourceKey);
+            if (badge is null) AppBadges.Insert(i, new(data, icon));
+            else
+            {
+                badge.Update(data, icon);
+                var previous = AppBadges.IndexOf(badge);
+                if (previous != i) AppBadges.Move(previous, i);
+            }
+        }
+        if ((!appSelectionInitialized || selectedAppKey is not null && !keys.Contains(selectedAppKey)) && catalog.Count > 0)
+            SelectApp(catalog[0].Profile.SourceKey);
+        else if (selectedAppKey is not null && catalog.Count == 0)
+        { selectedAppKey = null; appSelectionInitialized = false; }
+        foreach (var badge in AppBadges) badge.IsSelected = badge.SourceKey == selectedAppKey;
+        Raise(nameof(HasAppBadges)); Raise(nameof(SelectedAppName)); Raise(nameof(EmptyMessage));
     }
     private void Append(List<NotificationEntry> rows)
     {

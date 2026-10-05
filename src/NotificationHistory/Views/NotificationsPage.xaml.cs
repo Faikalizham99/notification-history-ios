@@ -64,14 +64,23 @@ public partial class NotificationsPage : ContentPage
         finally { deletingNotification = false; }
     }
     private async void OnFavoriteFilter(object? sender, EventArgs e) { vm.Favorites = !vm.Favorites; FavoriteButton.Text = vm.Favorites ? "★ Favorites" : "All"; await ReloadAsync(); }
+    private async void OnBadgeTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is not View { BindingContext: AppBadgeModel badge } || badge.IsSelected) return;
+        vm.SelectApp(badge.SourceKey); await ReloadAsync();
+    }
     private async void OnSource(object? sender, EventArgs e)
     {
         try
         {
-            var sources = await services.Database.SourcesAsync();
-            var choice = await DisplayActionSheetAsync("Source app", "Cancel", null, ["All apps", .. sources]);
+            // Numbered labels distinguish equal display names and reserved action-sheet labels.
+            var choices = vm.AppBadges.Select((badge, index) => new { Label = $"{index + 1}. {badge.DisplayName}", Badge = badge }).ToList();
+            var choice = await DisplayActionSheetAsync("Source app", "Cancel", null, ["All apps", .. choices.Select(c => c.Label)]);
             if (choice is null or "Cancel") return;
-            vm.Source = choice == "All apps" ? null : choice; SourceButton.Text = choice; await ReloadAsync();
+            vm.SelectApp(choice == "All apps" ? null : choices.First(c => c.Label == choice).Badge.SourceKey);
+            await ReloadAsync();
+            var selected = AppBadgeRow.Children.OfType<View>().FirstOrDefault(v => v.BindingContext is AppBadgeModel { IsSelected: true });
+            if (selected is not null) await AppBadgeScroll.ScrollToAsync(selected, ScrollToPosition.MakeVisible, true);
         }
         catch { await AppServices.AlertAsync("Unable to load apps", "Please try again."); }
     }

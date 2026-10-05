@@ -24,5 +24,5 @@ public sealed class NotificationEntry
 }
 
 public sealed record NotificationFilter(string? Search = null, bool Favorites = false,
- string? Source = null, long? From = null, long? To = null);
+ string? Source = null, long? From = null, long? To = null, IReadOnlyList<string?>? Sources = null);
 public sealed record PageCursor(long ReceivedAt, long Id);

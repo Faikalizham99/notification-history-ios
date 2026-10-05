@@ -79,7 +79,20 @@ public sealed class NotificationDatabase
     {
         var clauses = new List<string>(); var args = new List<object>();
         if (filter.Favorites) clauses.Add("IsFavorite=1");
-        if (filter.Source is not null) { clauses.Add("SourceApp=?"); args.Add(filter.Source); }
+        if (filter.Sources is { } sources)
+        {
+            var values = sources.Where(s => s is not null).Distinct().ToArray();
+            var sourceClauses = new List<string>();
+            if (values.Length > 0)
+            {
+                sourceClauses.Add("SourceApp IN (" + string.Join(",", values.Select(_ => "?")) + ")");
+                args.AddRange(values.Select(s => (object)s!));
+            }
+            if (sources.Contains(null)) sourceClauses.Add("SourceApp IS NULL");
+            // A configured app with no captures must not display other apps' history.
+            clauses.Add(sourceClauses.Count == 0 ? "0=1" : "(" + string.Join(" OR ", sourceClauses) + ")");
+        }
+        else if (filter.Source is not null) { clauses.Add("SourceApp=?"); args.Add(filter.Source); }
         if (filter.From is long from) { clauses.Add("ReceivedAt>=?"); args.Add(from); }
         if (filter.To is long to) { clauses.Add("ReceivedAt<?"); args.Add(to); }
         if (!string.IsNullOrWhiteSpace(filter.Search))
@@ -100,6 +113,8 @@ public sealed class NotificationDatabase
     public Task<NotificationEntry?> GetAsync(long id) => Run<NotificationEntry?>(db => db.Find<NotificationEntry>(id));
     public Task<List<string>> SourcesAsync() => Run(db => db.Query<SourceRow>(
      "SELECT DISTINCT SourceApp FROM Notifications WHERE SourceApp IS NOT NULL AND SourceApp <> '' ORDER BY SourceApp COLLATE NOCASE").Select(x => x.SourceApp).ToList());
+    public Task<List<NotificationSourceCount>> SourceCountsAsync(CancellationToken token = default) => Run(db =>
+        db.Query<NotificationSourceCount>("SELECT SourceApp,COUNT(*) AS Count FROM Notifications GROUP BY SourceApp ORDER BY SourceApp"), token);
     public Task SetFavoriteAsync(long id, bool value) => Run(db => db.Execute("UPDATE Notifications SET IsFavorite=? WHERE Id=?", value, id));
     public Task MarkReadAsync(long id) => Run(db => db.Execute("UPDATE Notifications SET IsRead=1 WHERE Id=?", id));
     public Task DeleteAsync(long id) => Run(db => db.Execute("DELETE FROM Notifications WHERE Id=?", id));
