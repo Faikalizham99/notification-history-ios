@@ -186,7 +186,8 @@ public sealed class AppAppearancePage : ContentPage
             this.changed = changed; current = initial;
             View = new Grid { ColumnDefinitions = { new(GridLength.Star), new(new GridLength(116)), new(new GridLength(44)) }, ColumnSpacing = 8 };
             var label = AppearanceUI.Text(title, 14); label.VerticalOptions = LayoutOptions.Center; View.Add(label);
-            hex = new Entry { Text = initial, MaxLength = 7, FontSize = 14, FontFamily = "Menlo", HorizontalTextAlignment = TextAlignment.End };
+            hex = new Entry { Text = initial, MaxLength = 7, FontSize = 14, FontFamily = "Menlo", HorizontalTextAlignment = TextAlignment.End,
+                ClearButtonVisibility = ClearButtonVisibility.Never };
             AppearanceUI.Input(hex);
             hex.TextChanged += (_, _) =>
             {
