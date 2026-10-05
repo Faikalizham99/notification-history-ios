@@ -4,8 +4,20 @@
  x:Class="NotificationHistory.Views.NotificationsPage" x:DataType="vm:NotificationsViewModel" Title="Notification History">
  <ContentPage.ToolbarItems><ToolbarItem Text="Apps" Clicked="OnApps" /><ToolbarItem Text="Settings" Clicked="OnSettings" /></ContentPage.ToolbarItems>
  <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Padding="16,8" RowSpacing="8">
-  <Border Style="{StaticResource InputBorderStyle}" Padding="0">
-   <SearchBar Placeholder="Search your history" Text="{Binding Search}" TextChanged="OnSearch" BackgroundColor="Transparent" />
+  <Border Style="{StaticResource InputBorderStyle}" Padding="14,4">
+   <Grid ColumnDefinitions="20,*" ColumnSpacing="10">
+    <Grid WidthRequest="20" HeightRequest="20" VerticalOptions="Center" InputTransparent="True">
+     <Ellipse WidthRequest="12" HeightRequest="12" HorizontalOptions="Start" VerticalOptions="Start"
+       Stroke="{AppThemeBinding Light=#62626B, Dark=#A4A4AD}" StrokeThickness="1.8" />
+     <Line X1="11" Y1="11" X2="17" Y2="17"
+       Stroke="{AppThemeBinding Light=#62626B, Dark=#A4A4AD}" StrokeThickness="1.8" />
+    </Grid>
+    <Entry x:Name="HistorySearch" Grid.Column="1" Placeholder="Search your history" Text="{Binding Search}" TextChanged="OnSearch"
+      BackgroundColor="Transparent" TextColor="{AppThemeBinding Light=#1C1C1E, Dark=White}"
+      PlaceholderColor="{AppThemeBinding Light=#62626B, Dark=#A4A4AD}" MinimumHeightRequest="44"
+      ReturnType="Search" ClearButtonVisibility="WhileEditing" SemanticProperties.Description="Search notification history" />
+   </Grid>
+   <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnSearchFieldTapped" /></Border.GestureRecognizers>
   </Border>
   <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
    <Button x:Name="FavoriteButton" Text="All" FontSize="13" Clicked="OnFavoriteFilter" />
