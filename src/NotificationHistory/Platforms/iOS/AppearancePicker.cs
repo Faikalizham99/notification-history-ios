@@ -11,9 +11,13 @@ public static class AppearancePicker
 {
     public static async Task<CroppedIcon?> PickIconAsync(string shape)
     {
-        using var picker = new PhotoController();
+        using var configuration = new PHPickerConfiguration { Filter = PHPickerFilter.ImagesFilter, SelectionLimit = 1 };
+        using var picker = new PHPickerViewController(configuration) { ModalPresentationStyle = UIModalPresentationStyle.FullScreen };
+        var completion = new TaskCompletionSource<NSData?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var pickerDelegate = new PhotoDelegate(completion);
+        picker.Delegate = pickerDelegate;
         Present(picker);
-        using var data = await picker.Completion.Task;
+        using var data = await completion.Task;
         if (data is null) return null;
         if (data.Length > 67_108_864) throw new ArgumentException("Choose a smaller photo and try again.");
         using var source = CGImageSource.FromData(data) ?? throw new ArgumentException("This photo could not be opened.");
@@ -47,16 +51,6 @@ public static class AppearancePicker
             ?? throw new InvalidOperationException("The editor is not ready. Try again.");
         controller.OverrideUserInterfaceStyle = UIUserInterfaceStyle.Dark;
         host.PresentViewController(controller, true, null);
-    }
-    private sealed class PhotoController : PHPickerViewController
-    {
-        private readonly PhotoDelegate pickerDelegate;
-        public TaskCompletionSource<NSData?> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public PhotoController() : base(new PHPickerConfiguration { Filter = PHPickerFilter.ImagesFilter, SelectionLimit = 1 })
-        {
-            pickerDelegate = new(Completion); Delegate = pickerDelegate;
-            ModalPresentationStyle = UIModalPresentationStyle.FullScreen;
-        }
     }
     private sealed class PhotoDelegate(TaskCompletionSource<NSData?> completion) : PHPickerViewControllerDelegate
     {
