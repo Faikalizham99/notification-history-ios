@@ -40,16 +40,13 @@ public static class AppearancePicker
         using var crop = new CropController(image, shape);
         Present(crop); return await crop.Completion.Task;
     }
-    public static void PickColor(string initial, string title, Action<string> changed)
-    {
-        var picker = new ColorController(initial, title, changed);
-        Present(picker);
-    }
     private static void Present(UIViewController controller)
     {
         var host = Microsoft.Maui.ApplicationModel.Platform.GetCurrentUIViewController()
             ?? throw new InvalidOperationException("The editor is not ready. Try again.");
-        controller.OverrideUserInterfaceStyle = UIUserInterfaceStyle.Dark;
+        var theme = Application.Current?.UserAppTheme ?? AppTheme.Unspecified;
+        if (theme == AppTheme.Unspecified) theme = Application.Current?.RequestedTheme ?? AppTheme.Light;
+        controller.OverrideUserInterfaceStyle = theme == AppTheme.Dark ? UIUserInterfaceStyle.Dark : UIUserInterfaceStyle.Light;
         host.PresentViewController(controller, true, null);
     }
     private sealed class PhotoDelegate(TaskCompletionSource<NSData?> completion) : PHPickerViewControllerDelegate
@@ -63,25 +60,6 @@ public static class AppearancePicker
             await dismissed.Task;
             try { completion.TrySetResult(results.Length == 0 ? null : await results[0].ItemProvider.LoadDataRepresentationAsync("public.image")); }
             catch { completion.TrySetException(new ArgumentException("This photo could not be opened. Choose another image.")); }
-        }
-    }
-    private sealed class ColorController : UIColorPickerViewController
-    {
-        private readonly ColorDelegate colorDelegate;
-        public ColorController(string initial, string title, Action<string> changed)
-        {
-            var color = Microsoft.Maui.Graphics.Color.FromArgb(initial);
-            SelectedColor = UIColor.FromRGBA(color.Red, color.Green, color.Blue, 1);
-            SupportsAlpha = false; Title = title;
-            colorDelegate = new(changed); Delegate = colorDelegate;
-        }
-    }
-    private sealed class ColorDelegate(Action<string> changed) : UIColorPickerViewControllerDelegate
-    {
-        public override void DidSelectColor(UIColorPickerViewController picker, UIColor color, bool continuously)
-        {
-            color.GetRGBA(out var red, out var green, out var blue, out _);
-            changed($"#{(int)Math.Round((double)red * 255):X2}{(int)Math.Round((double)green * 255):X2}{(int)Math.Round((double)blue * 255):X2}");
         }
     }
     private sealed class CropController : UIViewController
@@ -109,14 +87,14 @@ public static class AppearancePicker
         }
         public override void ViewDidLoad()
         {
-            base.ViewDidLoad(); View!.BackgroundColor = UIColor.Black;
+            base.ViewDidLoad(); View!.BackgroundColor = UIColor.SystemBackground;
             scroll.AddSubview(imageView); scroll.ClipsToBounds = true;
             scroll.Layer.BorderWidth = 1; scroll.Layer.BorderColor = UIColor.FromWhiteAlpha(.6f, 1).CGColor;
             scroll.AccessibilityLabel = "Crop image. Drag to position and pinch to zoom.";
-            instruction.TextColor = UIColor.FromWhiteAlpha(.65f, 1);
+            instruction.TextColor = UIColor.SecondaryLabel;
             View.AddSubviews(cancel, title, use, instruction, scroll, reset);
         }
-        public override UIStatusBarStyle PreferredStatusBarStyle() => UIStatusBarStyle.LightContent;
+        public override UIStatusBarStyle PreferredStatusBarStyle() => OverrideUserInterfaceStyle == UIUserInterfaceStyle.Dark ? UIStatusBarStyle.LightContent : UIStatusBarStyle.DarkContent;
         public override void ViewDidLayoutSubviews()
         {
             base.ViewDidLayoutSubviews();
@@ -165,12 +143,12 @@ public static class AppearancePicker
         private static UIButton Button(string text)
         {
             var button = new UIButton(UIButtonType.System);
-            button.SetTitle(text, UIControlState.Normal); button.SetTitleColor(UIColor.White, UIControlState.Normal);
+            button.SetTitle(text, UIControlState.Normal); button.SetTitleColor(UIColor.Label, UIControlState.Normal);
             button.TitleLabel!.Font = UIFont.SystemFontOfSize(17)!;
-            button.BackgroundColor = UIColor.FromWhiteAlpha(.12f, 1); button.Layer.CornerRadius = 23;
+            button.BackgroundColor = UIColor.SecondarySystemBackground; button.Layer.CornerRadius = 23;
             button.AccessibilityLabel = text; return button;
         }
-        private static UILabel Label(string text, nfloat size) => new() { Text = text, TextColor = UIColor.White,
+        private static UILabel Label(string text, nfloat size) => new() { Text = text, TextColor = UIColor.Label,
             TextAlignment = UITextAlignment.Center, Font = UIFont.SystemFontOfSize(size)! };
         private sealed class ZoomDelegate(UIView image) : UIScrollViewDelegate
         { public override UIView ViewForZoomingInScrollView(UIScrollView scrollView) => image; }

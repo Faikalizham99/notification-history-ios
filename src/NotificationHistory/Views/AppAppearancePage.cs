@@ -16,10 +16,10 @@ public sealed class AppAppearancePage : ContentPage
     private readonly Border hero = new() { WidthRequest = 96, HeightRequest = 96, StrokeThickness = 0 };
     private readonly Button save = AppearanceUI.Button("Save"), cancel = AppearanceUI.Button("Cancel"),
         changeIcon = AppearanceUI.Button("Change Icon  ›"), cropAgain = AppearanceUI.Button("Crop again"), removeIcon = AppearanceUI.Button("Remove icon");
-    private readonly Entry name = new() { TextColor = Colors.White, FontSize = 23, FontAttributes = FontAttributes.Bold, MaxLength = 80, Placeholder = "Display name" };
-    private readonly Entry source = new() { TextColor = Colors.White, MaxLength = 160, Placeholder = "WhatsApp" };
+    private readonly Entry name = new() { FontSize = 23, FontAttributes = FontAttributes.Bold, MaxLength = 80, Placeholder = "Display name" };
+    private readonly Entry source = new() { MaxLength = 160, Placeholder = "WhatsApp" };
     private readonly Switch gradient = new() { OnColor = Color.FromArgb("#14B8A6") }, automatic = new() { OnColor = Color.FromArgb("#14B8A6") };
-    private readonly Picker shape = new() { ItemsSource = new[] { "Rounded", "Circle" }, TextColor = Colors.White, Title = "Icon shape" };
+    private readonly Picker shape = new() { ItemsSource = new[] { "Rounded", "Circle" }, Title = "Icon shape" };
     private readonly VerticalStackLayout manualColors = new() { Spacing = 14 };
     private readonly ColorField backgroundField, gradientField, titleField, bodyField, timeField;
     private ImageSource? icon;
@@ -29,16 +29,20 @@ public sealed class AppAppearancePage : ContentPage
     public AppAppearancePage(AppServices services, AppProfile profile, bool saved)
     {
         this.services = services; draft = profile.Copy(); previousKey = saved ? profile.SourceKey : null;
-        Title = "App Appearance"; BackgroundColor = Color.FromArgb("#0B0B0D"); SafeAreaEdges = new(SafeAreaRegions.All);
+        Title = "App Appearance"; AppearanceUI.Page(this); SafeAreaEdges = new(SafeAreaRegions.All);
+        AppearanceUI.Input(name); AppearanceUI.Input(source);
+        shape.SetAppThemeColor(Picker.TextColorProperty, Color.FromArgb("#1C1C1E"), Colors.White);
+        shape.SetAppThemeColor(Picker.TitleColorProperty, Color.FromArgb("#62626B"), Color.FromArgb("#A4A4AD"));
+        shape.SetAppThemeColor(VisualElement.BackgroundColorProperty, Color.FromArgb("#EAEAEE"), Color.FromArgb("#2C2C2E"));
         NavigationPage.SetHasNavigationBar(this, false);
         var imagePath = services.Appearance.ImagePath(draft.ImageFile); icon = imagePath is null ? null : ImageSource.FromFile(imagePath);
         var stack = new VerticalStackLayout { Padding = new Thickness(20, 12, 20, 30), Spacing = 22 };
         cancel.Clicked += async (_, _) => { if (!busy) await Navigation.PopAsync(); };
-        save.BackgroundColor = Color.FromArgb("#087E8B"); save.Clicked += OnSave;
+        save.BackgroundColor = Color.FromArgb("#087E8B"); save.TextColor = Colors.White; save.Clicked += OnSave;
         var heading = new Grid { ColumnDefinitions = { new(new GridLength(96)), new(GridLength.Star) }, ColumnSpacing = 18 };
         heroInitial.HorizontalTextAlignment = TextAlignment.Center; heroInitial.VerticalTextAlignment = TextAlignment.Center;
         heading.Add(hero); name.Text = draft.DisplayName; name.TextChanged += (_, _) => { draft.DisplayName = name.Text ?? ""; Render(); }; heading.Add(name, 1);
-        stack.Add(heading); changeIcon.BackgroundColor = Colors.White; changeIcon.TextColor = Colors.Black; changeIcon.HorizontalOptions = LayoutOptions.Fill;
+        stack.Add(heading); changeIcon.HorizontalOptions = LayoutOptions.Fill;
         changeIcon.Clicked += OnPickIcon; stack.Add(changeIcon); progress.IsVisible = false; stack.Add(progress);
         var iconActions = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Star) }, ColumnSpacing = 10 };
         cropAgain.Clicked += OnCropAgain; removeIcon.Clicked += (_, _) => { originalBytes = croppedBytes = null; draft.ImageFile = draft.OriginalImageFile = null; icon = null; Render(); };
@@ -61,15 +65,15 @@ public sealed class AppAppearancePage : ContentPage
         }
         var colors = new VerticalStackLayout { Spacing = 16 };
         colors.Add(AppearanceUI.Text("Color scheme", 22, true)); colors.Add(AppearanceUI.Caption("Choose a preset, tap a color, or enter a hex value.")); colors.Add(palette);
-        backgroundField = new("Background", draft.BackgroundColor, value => { draft.BackgroundColor = value; Render(); }); colors.Add(backgroundField.View);
-        gradientField = new("Gradient end", draft.GradientColor, value => { draft.GradientColor = value; Render(); });
+        backgroundField = new(this, "Background", draft.BackgroundColor, value => { draft.BackgroundColor = value; Render(); }); colors.Add(backgroundField.View);
+        gradientField = new(this, "Gradient end", draft.GradientColor, value => { draft.GradientColor = value; Render(); });
         gradient.IsToggled = draft.UseGradient; gradient.Toggled += (_, _) => { draft.UseGradient = gradient.IsToggled; gradientField.View.IsVisible = draft.UseGradient; Render(); };
         colors.Add(ToggleRow("Gradient background", gradient)); colors.Add(gradientField.View);
         automatic.IsToggled = draft.AutoTextColor; automatic.Toggled += (_, _) => { draft.AutoTextColor = automatic.IsToggled; manualColors.IsVisible = !draft.AutoTextColor; Render(); };
         colors.Add(ToggleRow("Automatic readable text", automatic));
-        titleField = new("App name & title", draft.TitleColor, value => { draft.TitleColor = value; Render(); });
-        bodyField = new("Message", draft.BodyColor, value => { draft.BodyColor = value; Render(); });
-        timeField = new("Timestamp", draft.TimestampColor, value => { draft.TimestampColor = value; Render(); });
+        titleField = new(this, "App name & title", draft.TitleColor, value => { draft.TitleColor = value; Render(); });
+        bodyField = new(this, "Message", draft.BodyColor, value => { draft.BodyColor = value; Render(); });
+        timeField = new(this, "Timestamp", draft.TimestampColor, value => { draft.TimestampColor = value; Render(); });
         manualColors.Add(titleField.View); manualColors.Add(bodyField.View); manualColors.Add(timeField.View); colors.Add(manualColors);
         stack.Add(AppearanceUI.Panel(colors));
         var defaults = AppearanceUI.Button("Reset appearance"); defaults.Clicked += async (_, _) =>
@@ -82,7 +86,7 @@ public sealed class AppAppearancePage : ContentPage
         }; stack.Add(defaults);
         if (previousKey is not null)
         {
-            var removeAppearance = AppearanceUI.Button("Remove custom appearance"); removeAppearance.TextColor = Color.FromArgb("#FF8A8A");
+            var removeAppearance = AppearanceUI.Button("Remove custom appearance"); removeAppearance.SetAppThemeColor(Button.TextColorProperty, Color.FromArgb("#B42323"), Color.FromArgb("#FF8A8A"));
             removeAppearance.Clicked += async (_, _) =>
             {
                 if (busy || !await DisplayAlertAsync("Remove custom appearance?", "Restore the default appearance for this source. Your notification history will be kept.", "Remove", "Cancel")) return;
@@ -178,22 +182,23 @@ public sealed class AppAppearancePage : ContentPage
         private readonly Action<string> changed;
         private string current;
         public Grid View { get; }
-        public ColorField(string title, string initial, Action<string> changed)
+        public ColorField(ContentPage owner, string title, string initial, Action<string> changed)
         {
             this.changed = changed; current = initial;
             View = new Grid { ColumnDefinitions = { new(GridLength.Star), new(new GridLength(98)), new(new GridLength(44)) }, ColumnSpacing = 8 };
             var label = AppearanceUI.Text(title, 14); label.VerticalOptions = LayoutOptions.Center; View.Add(label);
-            hex = new Entry { Text = initial, MaxLength = 7, TextColor = Colors.White, FontSize = 14, FontFamily = "Menlo", HorizontalTextAlignment = TextAlignment.End };
+            hex = new Entry { Text = initial, MaxLength = 7, FontSize = 14, FontFamily = "Menlo", HorizontalTextAlignment = TextAlignment.End };
+            AppearanceUI.Input(hex);
             hex.TextChanged += (_, _) =>
             {
-                if (AppearanceColors.TryNormalize(hex.Text, out var value)) { current = value; swatch!.BackgroundColor = Color.FromArgb(value); hex.TextColor = Colors.White; changed(value); }
-                else hex.TextColor = Color.FromArgb("#FF8A8A");
+                if (AppearanceColors.TryNormalize(hex.Text, out var value)) { current = value; swatch!.BackgroundColor = Color.FromArgb(value); AppearanceUI.Input(hex); changed(value); }
+                else hex.SetAppThemeColor(InputView.TextColorProperty, Color.FromArgb("#B42323"), Color.FromArgb("#FF8A8A"));
             }; View.Add(hex, 1);
-            swatch = AppearanceUI.Button(" "); swatch.HeightRequest = 40; swatch.Padding = 0; swatch.BackgroundColor = Color.FromArgb(initial);
+            swatch = AppearanceUI.Button(" "); swatch.HeightRequest = 40; swatch.CornerRadius = 20; swatch.Padding = 0; swatch.BackgroundColor = Color.FromArgb(initial);
             SemanticProperties.SetDescription(swatch, "Choose " + title.ToLowerInvariant() + " color");
             swatch.Clicked += async (_, _) =>
             {
-                try { AppearancePicker.PickColor(current, title, value => hex.Text = value); }
+                try { await owner.Navigation.PushModalAsync(new ColorWheelPage(title, current, value => hex.Text = value)); }
                 catch { await AppServices.AlertAsync("Color picker unavailable", "Please try again."); }
             }; View.Add(swatch, 2);
         }

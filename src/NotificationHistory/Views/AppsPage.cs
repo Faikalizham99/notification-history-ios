@@ -7,11 +7,11 @@ public sealed class AppsPage : ContentPage
 {
     private readonly AppServices services;
     private readonly VerticalStackLayout rows = new() { Spacing = 12 };
-    private readonly ActivityIndicator loading = new() { Color = Colors.White };
+    private readonly ActivityIndicator loading = new() { Color = Color.FromArgb("#087E8B") };
     private bool busy;
     public AppsPage(AppServices services)
     {
-        this.services = services; Title = "Apps"; BackgroundColor = Color.FromArgb("#0B0B0D");
+        this.services = services; Title = "Apps"; AppearanceUI.Page(this);
         SafeAreaEdges = new(SafeAreaRegions.All); NavigationPage.SetHasNavigationBar(this, false);
         var back = AppearanceUI.Button("‹ Back"); back.Clicked += async (_, _) => await Navigation.PopAsync();
         var add = AppearanceUI.Button("+ Add"); add.Clicked += OnAdd;

@@ -35,6 +35,10 @@ static class AppearanceTests
             AppearanceColors.AutomaticText("#000000") == "#FFFFFF" && AppearanceColors.AutomaticText("#FFFFFF") == "#111111", "Color validation and readable light/dark text selection");
         Check(!AppearanceColors.IsImageFile("../../secret.png") && !AppearanceColors.IsImageFile("https://example.com/icon.png") &&
             AppearanceColors.IsImageFile(Guid.NewGuid().ToString("N") + "-source.png"), "Icon references allow only generated local filenames");
+        var colors = new[] { "#000000", "#FFFFFF", "#808080", "#FF0000", "#00FF00", "#0000FF", "#075E54", "#B84376", "#ABCDEF" };
+        Check(colors.All(hex => { var hsv = ColorWheelMath.FromHex(hex); return ColorWheelMath.ToHex(hsv.Hue, hsv.Saturation, hsv.Value) == hex; }), "Color wheel preserves exact selected colors across RGB and HSV conversion");
+        Check(ColorWheelMath.AtPoint(0, 0, .6) == (.6, 0) && ColorWheelMath.AtPoint(2, 0, .6) == (0, 1) && ColorWheelMath.AtPoint(0, 1, 0) == (.25, 1), "Color wheel center preserves hue and outside drags clamp to its edge");
+        Check(ColorWheelMath.ToHex(.5, 0, 1) == "#FFFFFF" && ColorWheelMath.ToHex(.5, 1, 0) == "#000000" && ColorWheelMath.ToHex(1, 1, 1) == "#FF0000", "Color wheel saturation, brightness, and hue wrap cover white, black, and red");
         var portrait = IconCropGeometry.DrawRectangle(100, 200, 300, 3, 0, 150);
         var landscape = IconCropGeometry.DrawRectangle(200, 100, 300, 3, 150, 0);
         Check(portrait == new IconDrawRectangle(0, -256, 512, 1024) && landscape == new IconDrawRectangle(-256, 0, 1024, 512), "Centered portrait and landscape crops map to the correct output pixels");
