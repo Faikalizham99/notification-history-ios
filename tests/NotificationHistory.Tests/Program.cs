@@ -8,8 +8,15 @@ if (args.Length == 2)
     var shared = new NotificationDatabase(args[1]);
     switch (args[0])
     {
+        case "--seed-legacy-shared": AppearanceTests.SeedLegacy(args[1]); break;
+        case "--verify-legacy-shared":
+            Check((await shared.GetAsync(1)) is { Body: "Legacy message", IsFavorite: true, CaptureId: "legacy-event" } &&
+                (await shared.QueryAsync(new())).Count == 2 && await shared.SettingAsync("appearance") == "Dark" &&
+                (await shared.ProfilesAsync()).Count == 0, "Native migration preserves legacy managed history and settings"); break;
         case "--seed-shared":
             await shared.SaveAsync(new() { SourceApp = "Managed 👋", Title = "Ali", Body = "Bro tomorrow jadi? 明天见\n100% _" });
+            var appProfile = AppProfile.Default("Managed 👋"); appProfile.DisplayName = "Configured app";
+            appProfile.BackgroundColor = "#075E54"; appProfile.IconShape = "Circle"; await shared.SaveProfileAsync(appProfile);
             await shared.SaveAsync(new()); break;
         case "--burst-shared":
             for (var i = 0; i < 64; i++) await shared.SaveAsync(new() { SourceApp = "Managed burst", Title = i.ToString() });
@@ -29,6 +36,7 @@ Directory.CreateDirectory(directory);
 try
 {
     SigningTests.Run(Path.Combine(directory, "signing"));
+    await AppearanceTests.RunAsync(directory);
     var path = Path.Combine(directory, "history.sqlite3"); var db = new NotificationDatabase(path);
     var now = DateTimeOffset.UtcNow;
     var body = "Bro tomorrow jadi? 👋 明天见\n100% _ literal ' quote" + new string('x', 30000);
@@ -102,7 +110,7 @@ try
     var cancelledCorrectly = false;
     try { await db.QueryAsync(new(), token: cancelled.Token); } catch (OperationCanceledException) { cancelledCorrectly = true; }
     Check(cancelledCorrectly, "Cancelled query does not perform database work");
-    using (var future = new SQLite.SQLiteConnection(path)) future.Execute("PRAGMA user_version=2");
+    using (var future = new SQLite.SQLiteConnection(path)) future.Execute("PRAGMA user_version=3");
     var futureRejected = false;
     try { await new NotificationDatabase(path).QueryAsync(new()); } catch (InvalidOperationException) { futureRejected = true; }
     Check(futureRejected, "Newer schema rejected without destructive recovery");

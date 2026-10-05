@@ -38,6 +38,17 @@ struct NativeStorageTests {
         }
         let file = URL(fileURLWithPath: CommandLine.arguments[1])
         let schema = URL(fileURLWithPath: CommandLine.arguments[2])
+        if CommandLine.arguments.count == 4 && CommandLine.arguments[3] == "--verify-legacy" {
+            let old = try SharedDatabase(readOnly: true, testingPath: file).snapshot()
+            guard old.recent.count == 1, old.recent.first?.body == "Legacy message", old.recent.first?.appearance == nil else {
+                fatalError("Read-only widget cannot read version-1 history")
+            }
+            _ = try SharedDatabase(testingPath: file, schemaURL: schema).save(source: "Native migration", title: "New", subtitle: nil, body: "After migration")
+            let migrated = try SharedDatabase(readOnly: true, testingPath: file).snapshot()
+            guard migrated.recent.count == 2 else { fatalError("Native migration lost history") }
+            print("PASS native version-1 read and version-2 migration preserve existing history")
+            return
+        }
         if CommandLine.arguments.count == 4 && CommandLine.arguments[3] == "--verify-seed" {
             let store = try SharedDatabase(testingPath: file, schemaURL: schema)
             let snapshot = try store.snapshot()
@@ -47,6 +58,11 @@ struct NativeStorageTests {
                 fatalError("Native reader could not read managed data")
             }
             print("PASS Native reads managed Unicode and partial fields")
+            guard let profile = snapshot.recent.first(where: { $0.source == "Managed 👋" })?.appearance,
+                  profile.displayName == "Configured app", profile.background == "#075E54", profile.circle else {
+                fatalError("Widget cannot read managed appearance profiles")
+            }
+            print("PASS native widget reads managed app appearance profiles")
             return
         }
         _ = try SharedDatabase(testingPath: file, schemaURL: schema).save(source: "Native 🐈", title: "Ali", subtitle: nil, body: "Swift → C# 明天见\nRM25.00")

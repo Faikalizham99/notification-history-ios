@@ -6,6 +6,7 @@ namespace NotificationHistory.Services;
 public sealed class AppServices(NotificationDatabase database)
 {
     public NotificationDatabase Database { get; } = database;
+    public AppearanceStore Appearance { get; } = new(database);
     public event EventHandler? Changed;
     private string? pendingLink;
     private bool navigationReady;

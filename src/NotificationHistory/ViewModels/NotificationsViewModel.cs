@@ -3,7 +3,7 @@ using NotificationHistory.Core.Models;
 using NotificationHistory.Services;
 namespace NotificationHistory.ViewModels;
 
-public sealed class NotificationGroup(string title) : ObservableCollection<NotificationEntry> { public string Title { get; } = title; }
+public sealed class NotificationGroup(string title) : ObservableCollection<NotificationCardModel> { public string Title { get; } = title; }
 public sealed class NotificationsViewModel(AppServices services) : ObservableViewModel
 {
     public ObservableCollection<NotificationGroup> Groups { get; } = [];
@@ -12,6 +12,7 @@ public sealed class NotificationsViewModel(AppServices services) : ObservableVie
     private PageCursor? cursor;
     private bool more = true, busy;
     private int generation;
+    private Dictionary<string, AppProfile> profiles = new(StringComparer.Ordinal);
     public bool Busy { get => busy; private set => Set(ref busy, value); }
     public string Search { get; set; } = "";
     public bool Favorites { get; set; }
@@ -28,7 +29,9 @@ public sealed class NotificationsViewModel(AppServices services) : ObservableVie
             await loading.WaitAsync(token);
             try
             {
-                Busy = true; var rows = await services.Database.QueryAsync(Filter(), token: token);
+                Busy = true;
+                profiles = (await services.Appearance.LoadAsync()).ToDictionary(p => p.SourceKey, StringComparer.Ordinal);
+                var rows = await services.Database.QueryAsync(Filter(), token: token);
                 if (current != generation) return;
                 Groups.Clear(); cursor = null; more = true; Append(rows);
             }
@@ -63,7 +66,9 @@ public sealed class NotificationsViewModel(AppServices services) : ObservableVie
             var title = date == DateTime.Today ? "Today" : date == DateTime.Today.AddDays(-1) ? "Yesterday" : date.ToString("ddd, d MMM yyyy");
             var group = Groups.LastOrDefault();
             if (group?.Title != title) { group = new(title); Groups.Add(group); }
-            group.Add(entry);
+            var profile = profiles.GetValueOrDefault(AppProfile.Key(entry.SourceApp)) ?? AppProfile.Default(entry.SourceApp);
+            var image = services.Appearance.ImagePath(profile.ImageFile);
+            group.Add(new(entry, profile, image is null ? null : ImageSource.FromFile(image)));
         }
         more = rows.Count == 60;
         if (rows.LastOrDefault() is { } last) cursor = new(last.ReceivedAt, last.Id);

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui" xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
- xmlns:vm="clr-namespace:NotificationHistory.ViewModels" xmlns:model="clr-namespace:NotificationHistory.Core.Models;assembly=NotificationHistory.Core"
+ xmlns:vm="clr-namespace:NotificationHistory.ViewModels" xmlns:views="clr-namespace:NotificationHistory.Views"
  x:Class="NotificationHistory.Views.NotificationsPage" x:DataType="vm:NotificationsViewModel" Title="Notification History">
- <ContentPage.ToolbarItems><ToolbarItem Text="Setup" Clicked="OnSetup" /><ToolbarItem Text="Settings" Clicked="OnSettings" /></ContentPage.ToolbarItems>
+ <ContentPage.ToolbarItems><ToolbarItem Text="Apps" Clicked="OnApps" /><ToolbarItem Text="Settings" Clicked="OnSettings" /></ContentPage.ToolbarItems>
  <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="16,8" RowSpacing="8">
   <SearchBar Placeholder="Search your history" Text="{Binding Search}" TextChanged="OnSearch" />
   <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
@@ -16,16 +16,8 @@
      RemainingItemsThreshold="12" RemainingItemsThresholdReached="OnLoadMore">
     <CollectionView.EmptyView><VerticalStackLayout Padding="24,60" Spacing="12"><Label Text="A little peace of mind" FontSize="24" HorizontalTextAlignment="Center" /><Label Text="Saved notifications will appear here. Set up a Shortcut to start capturing." HorizontalTextAlignment="Center" /></VerticalStackLayout></CollectionView.EmptyView>
     <CollectionView.GroupHeaderTemplate><DataTemplate x:DataType="vm:NotificationGroup"><Label Text="{Binding Title}" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#636366, Dark=#AEAEB2}" Padding="4,18,4,8" /></DataTemplate></CollectionView.GroupHeaderTemplate>
-    <CollectionView.ItemTemplate><DataTemplate x:DataType="model:NotificationEntry">
-     <Border Margin="0,0,0,8" Padding="16,12" StrokeThickness="0" BackgroundColor="{AppThemeBinding Light=White, Dark=#1C1C1E}">
-      <Border.StrokeShape><RoundRectangle CornerRadius="14" /></Border.StrokeShape>
-      <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto" RowSpacing="5">
-       <Label Text="{Binding SourceDisplay}" FontSize="13" FontAttributes="Bold" TextColor="#087E8B" MaxLines="1" />
-       <HorizontalStackLayout Grid.Column="1" Spacing="6"><Label Text="{Binding FavoriteDisplay}" TextColor="#D99000" /><Label Text="{Binding TimeDisplay}" FontSize="12" TextColor="{AppThemeBinding Light=#636366, Dark=#AEAEB2}" /></HorizontalStackLayout>
-       <Label Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding TitleDisplay}" FontSize="17" FontAttributes="Bold" MaxLines="1" LineBreakMode="TailTruncation" />
-       <Label Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding Preview}" FontSize="14" MaxLines="2" LineBreakMode="TailTruncation" />
-      </Grid>
-     </Border>
+    <CollectionView.ItemTemplate><DataTemplate x:DataType="vm:NotificationCardModel">
+     <views:NotificationCardView Margin="0,0,0,12" />
     </DataTemplate></CollectionView.ItemTemplate>
    </CollectionView>
   </RefreshView>

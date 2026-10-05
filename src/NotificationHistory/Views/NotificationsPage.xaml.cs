@@ -32,7 +32,7 @@ public partial class NotificationsPage : ContentPage
     private async void OnLoadMore(object? sender, EventArgs e) { if (vm is not null) await vm.LoadMoreAsync(); }
     private async void OnSelected(object? sender, SelectionChangedEventArgs e)
     {
-        if (e.CurrentSelection.FirstOrDefault() is NotificationEntry entry) { ((CollectionView)sender!).SelectedItem = null; await services.OpenDetailAsync(entry.Id); }
+        if (e.CurrentSelection.FirstOrDefault() is NotificationCardModel card) { ((CollectionView)sender!).SelectedItem = null; await services.OpenDetailAsync(card.Entry.Id); }
     }
     private async void OnFavoriteFilter(object? sender, EventArgs e) { vm.Favorites = !vm.Favorites; FavoriteButton.Text = vm.Favorites ? "★ Favorites" : "All"; await vm.ReloadAsync(); }
     private async void OnSource(object? sender, EventArgs e)
@@ -53,5 +53,6 @@ public partial class NotificationsPage : ContentPage
     }
     private async void OnDateSelected(object? sender, DateChangedEventArgs e) { if (vm is not null && !initializingDate) { vm.Date = e.NewDate; await vm.ReloadAsync(); } }
     private async void OnSetup(object? sender, EventArgs e) => await Navigation.PushAsync(new OnboardingPage(services));
+    private async void OnApps(object? sender, EventArgs e) => await Navigation.PushAsync(new AppsPage(services));
     private async void OnSettings(object? sender, EventArgs e) => await Navigation.PushAsync(new SettingsPage(services));
 }

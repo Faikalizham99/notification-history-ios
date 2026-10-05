@@ -1,5 +1,6 @@
 import SwiftUI
 import WidgetKit
+import UIKit
 
 struct HistoryTimelineEntry: TimelineEntry {
     let date: Date
@@ -45,16 +46,11 @@ struct HistoryWidgetView: View {
             if entry.recent.isEmpty {
                 Text(entry.unavailable ? "Open history or unlock your iPhone to access saved notifications." : "No captured notifications yet.").font(.caption).foregroundStyle(.secondary)
             } else if family == .systemSmall, let latest = entry.recent.first {
-                Text(latest.sourceDisplay).font(.caption).foregroundStyle(.secondary).lineLimit(1).privacySensitive()
-                Text(latest.titleDisplay).font(.headline).lineLimit(2).privacySensitive()
+                AppearanceNotificationRow(item: latest, small: true)
             } else {
                 ForEach(entry.recent, id: \.id) { item in
                     Link(destination: item.url) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.sourceDisplay).font(.caption2.weight(.semibold)).foregroundStyle(.teal).lineLimit(1).privacySensitive()
-                            Text("\(item.titleDisplay): \(item.preview)")
-                                .font(.caption).foregroundStyle(.primary).lineLimit(1).privacySensitive()
-                        }.frame(maxWidth: .infinity, alignment: .leading)
+                        AppearanceNotificationRow(item: item, small: false)
                     }
                 }
             }
@@ -62,6 +58,53 @@ struct HistoryWidgetView: View {
         }
         .containerBackground(.background, for: .widget)
         .widgetURL(family == .systemSmall ? entry.recent.first?.url ?? URL(string: "notificationhistory://history") : URL(string: "notificationhistory://history"))
+    }
+}
+private struct AppearanceNotificationRow: View {
+    let item: CapturedNotification
+    let small: Bool
+    private var appearance: NotificationAppearance? { item.appearance }
+    private var background: Color { .appearanceHex(appearance?.background ?? "#242426") }
+    private var end: Color { .appearanceHex(appearance?.useGradient == true ? appearance!.gradient : appearance?.background ?? "#242426") }
+    private var textColor: Color {
+        guard appearance?.autoText == true else { return .appearanceHex(appearance?.titleColor ?? "#FFFFFF") }
+        func luminance(_ hex: String) -> Double {
+            let value = UInt32(hex.trimmingCharacters(in: CharacterSet(charactersIn: "#")), radix: 16) ?? 0
+            func channel(_ offset: UInt32) -> Double {
+                let c = Double((value >> offset) & 255) / 255
+                return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+            }
+            return 0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
+        }
+        let values = [luminance(appearance!.background), luminance(appearance!.useGradient ? appearance!.gradient : appearance!.background)]
+        return 1.05 / (values.max()! + 0.05) >= (values.min()! + 0.05) / (0.005605391624202723 + 0.05) ? .white : .appearanceHex("#111111")
+    }
+    var body: some View {
+        HStack(alignment: .top, spacing: 7) {
+            Group {
+                if let path = appearance?.imagePath, let image = UIImage(contentsOfFile: path) {
+                    Image(uiImage: image).resizable().scaledToFill()
+                } else {
+                    Text(String(item.sourceDisplay.prefix(1)).uppercased()).font(.caption.bold())
+                        .frame(maxWidth: .infinity, maxHeight: .infinity).background(.white.opacity(0.15))
+                }
+            }.frame(width: small ? 30 : 24, height: small ? 30 : 24)
+                .clipShape(RoundedRectangle(cornerRadius: appearance?.circle == true ? 20 : 7)).foregroundStyle(textColor).privacySensitive()
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.sourceDisplay).font(.caption2.weight(.semibold)).foregroundStyle(textColor).lineLimit(1).privacySensitive()
+                Text(small ? item.titleDisplay : "\(item.titleDisplay): \(item.preview)")
+                    .font(small ? .caption.weight(.semibold) : .caption2)
+                    .foregroundStyle(appearance?.autoText == true ? textColor : .appearanceHex(appearance?.bodyColor ?? "#FFFFFF"))
+                    .lineLimit(small ? 2 : 1).privacySensitive()
+            }.frame(maxWidth: .infinity, alignment: .leading)
+        }.padding(7).background(LinearGradient(colors: [background, end], startPoint: .topLeading, endPoint: .bottomTrailing))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+private extension Color {
+    static func appearanceHex(_ hex: String) -> Color {
+        let value = UInt32(hex.trimmingCharacters(in: CharacterSet(charactersIn: "#")), radix: 16) ?? 0x242426
+        return Color(red: Double((value >> 16) & 255) / 255, green: Double((value >> 8) & 255) / 255, blue: Double(value & 255) / 255)
     }
 }
 @main

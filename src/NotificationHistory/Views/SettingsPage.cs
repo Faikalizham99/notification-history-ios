@@ -19,6 +19,10 @@ public sealed class SettingsPage : ContentPage
         var clear = new Button { Text = "Clear all history", BackgroundColor = Color.FromArgb("#C43C35") };
         clear.Clicked += async (_, _) => await Run(async () => { if (await AppServices.ConfirmAsync("Clear all history?", "All notifications, including favorites, will be permanently removed.")) await vm.ClearAsync(); }); stack.Add(clear);
         stack.Add(new Label { Text = "Appearance", FontSize = 24, FontAttributes = FontAttributes.Bold }); stack.Add(appearance);
+        var apps = new Button { Text = "App photos and colors" };
+        apps.Clicked += async (_, _) => await Navigation.PushAsync(new AppsPage(services)); stack.Add(apps);
+        var setup = new Button { Text = "Shortcut setup" };
+        setup.Clicked += async (_, _) => await Navigation.PushAsync(new OnboardingPage(services)); stack.Add(setup);
         appearance.SelectedIndexChanged += async (_, _) => { if (ready && appearance.SelectedItem is string theme) await Run(() => vm.SetAppearanceAsync(theme)); };
         stack.Add(new Label { Text = "Private by design", FontSize = 24, FontAttributes = FontAttributes.Bold });
         stack.Add(new Label { Text = "Your history stays on this device. No cloud sync, analytics, advertising, or external API uploads. Shared history is excluded from device backups. Notification previews may be visible on your Home Screen widget. Copying content places it on the system clipboard, where Universal Clipboard may share it if enabled.", FontSize = 15 });

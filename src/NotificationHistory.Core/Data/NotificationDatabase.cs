@@ -31,8 +31,8 @@ public sealed class NotificationDatabase
                     try
                     {
                         var version = db.ExecuteScalar<int>("PRAGMA user_version");
-                        if (version > 1) throw new InvalidOperationException("Update the app to read this database.");
-                        if (version == 0)
+                        if (version > 2) throw new InvalidOperationException("Update the app to read this database.");
+                        if (version < 2)
                         {
                             using var resource = typeof(NotificationDatabase).Assembly.GetManifestResourceStream("schema.sql")!;
                             using var reader = new StreamReader(resource);
@@ -106,6 +106,25 @@ public sealed class NotificationDatabase
     public Task ClearAsync() => Run(db => { db.Execute("DELETE FROM Notifications"); db.ExecuteScalar<int>("PRAGMA wal_checkpoint(TRUNCATE)"); return 0; });
     public Task<string?> SettingAsync(string key) => Run(db => db.ExecuteScalar<string?>("SELECT Value FROM Settings WHERE Key=?", key));
     public Task SetSettingAsync(string key, string value) => Run(db => db.Execute("INSERT OR REPLACE INTO Settings(Key,Value) VALUES(?,?)", key, value));
+    public Task<List<AppProfile>> ProfilesAsync() => Run(db => db.Table<AppProfile>().OrderBy(x => x.DisplayName).ToList());
+    public Task SaveProfileAsync(AppProfile profile, string? previousKey = null) => Run(db =>
+    {
+        profile.Validate();
+        db.Execute("BEGIN IMMEDIATE");
+        try
+        {
+            if (profile.SourceKey != previousKey && db.Find<AppProfile>(profile.SourceKey) is not null)
+                throw new ArgumentException("This source app already has an appearance. Edit that app instead.");
+            db.Execute("INSERT OR REPLACE INTO AppProfiles(SourceKey,SourceName,DisplayName,BackgroundColor,GradientColor,UseGradient,TitleColor,BodyColor,TimestampColor,AutoTextColor,ImageFile,OriginalImageFile,IconShape) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                profile.SourceKey, profile.SourceName, profile.DisplayName, profile.BackgroundColor, profile.GradientColor,
+                profile.UseGradient, profile.TitleColor, profile.BodyColor, profile.TimestampColor, profile.AutoTextColor,
+                profile.ImageFile, profile.OriginalImageFile, profile.IconShape);
+            if (previousKey is not null && previousKey != profile.SourceKey) db.Delete<AppProfile>(previousKey);
+            db.Execute("COMMIT"); return 0;
+        }
+        catch { db.Execute("ROLLBACK"); throw; }
+    });
+    public Task DeleteProfileAsync(string key) => Run(db => db.Delete<AppProfile>(key));
     public Task<int> CleanupAsync(DateTimeOffset? now = null) => Run(db => Cleanup(db, (now ?? DateTimeOffset.UtcNow).ToUnixTimeMilliseconds()));
     private static int Cleanup(SQLiteConnection db, long now)
     {

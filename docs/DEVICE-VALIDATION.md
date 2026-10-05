@@ -30,6 +30,16 @@ These checks need a signed build on an actual iOS 27 iPhone. They have not been 
 5. Change System, Light, and Dark, relaunch, and verify persistence. Check smallest supported screen, landscape, safe areas, VoiceOver labels, and large text. Review the screen recording or screenshots for clipped controls.
 6. Use at least 10,000 synthetic notifications to assess incremental loading and search latency on the target phone. Confirm scrolling memory stays bounded by displayed pages and body previews; clear afterward.
 
+## App appearance and photo cropping
+
+1. Upgrade over a version-1 installation with the same signing identity. Confirm history, favorites, settings, and Shortcut saves remain available.
+2. Open Apps, edit a discovered app, and add an app before capturing its first notification. Verify source matching across case/whitespace, separate display names, and duplicate-source rejection.
+3. Select portrait, landscape, rotated/HEIC, and transparent PNG photos. Drag, pinch, Reset, Cancel, and Use. Confirm the saved 512-pixel icon matches the crop frame; Crop again should use the larger resized source.
+4. Change presets, native picker colors, hex values, gradient toggle, automatic text, and all manual text colors. Compare the preview with the saved history card. Try invalid hex and empty names without losing the existing appearance.
+5. Cancel the photo picker, crop, and page. Confirm the previous appearance remains. Replace/remove photos, relaunch, and check persistence. Clear history and verify app photos survive; remove appearance and verify default cards return.
+6. Check the smallest supported phone, landscape, large text, VoiceOver, long app names/messages, fixed Save/Cancel header, scrolling, and keyboard-safe color/source fields. Compare rounded/circular masks with the crop frame.
+7. Verify saved appearance on both widget sizes and captured records with the app closed. Profile changes must not alter stored notification content; widget reload timing is controlled by iOS.
+
 ## Widget and deep links
 
 1. Add both small and medium widgets from the gallery. Verify today’s count, most recent source/title, and three medium rows.

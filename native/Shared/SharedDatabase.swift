@@ -1,6 +1,18 @@
 import Foundation
 import SQLite3
 
+struct NotificationAppearance: Sendable {
+    let displayName: String
+    let background: String
+    let gradient: String
+    let useGradient: Bool
+    let titleColor: String
+    let bodyColor: String
+    let autoText: Bool
+    let imagePath: String?
+    let circle: Bool
+}
+
 struct CapturedNotification: Sendable {
     let id: Int64
     let source: String?
@@ -8,8 +20,10 @@ struct CapturedNotification: Sendable {
     let subtitle: String?
     let body: String?
     let receivedAt: Int64
+    var appearance: NotificationAppearance? = nil
     var url: URL { URL(string: "notificationhistory://notification/\(id)")! }
     var sourceDisplay: String {
+        if let appearance { return appearance.displayName }
         guard let source, !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return "Unknown app" }
         return source
     }
@@ -39,6 +53,8 @@ enum HistoryError: LocalizedError {
 final class SharedDatabase {
     private var handle: OpaquePointer?
     private var writerLock: SharedWriterLock?
+    private var appearanceAvailable = false
+    private var iconDirectory: URL?
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
     init(readOnly: Bool = false, testingPath: URL? = nil, schemaURL: URL? = nil) throws {
@@ -62,6 +78,7 @@ final class SharedDatabase {
             file = directory.appendingPathComponent("history.sqlite3")
         }
         if !readOnly { writerLock = try SharedWriterLock(path: file.path) }
+        iconDirectory = file.deletingLastPathComponent().appendingPathComponent("Icons", isDirectory: true)
         let flags = (readOnly ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE) | SQLITE_OPEN_FULLMUTEX
         guard sqlite3_open_v2(file.path, &handle, flags, nil) == SQLITE_OK else {
             if let handle { sqlite3_close(handle) }; handle = nil; throw HistoryError.unavailable
@@ -74,16 +91,18 @@ final class SharedDatabase {
                 try exec("BEGIN IMMEDIATE")
                 do {
                     let version = try scalar("PRAGMA user_version")
-                    guard version <= 1 else { throw HistoryError.newerSchema }
-                    if version == 0 {
+                    guard version <= 2 else { throw HistoryError.newerSchema }
+                    if version < 2 {
                         guard let url = schemaURL ?? Bundle.main.url(forResource: "schema", withExtension: "sql") else { throw HistoryError.database }
                         try exec(String(contentsOf: url, encoding: .utf8))
                     }
                     try exec("COMMIT")
+                    appearanceAvailable = try scalar("PRAGMA user_version") == 2
                 } catch { try? exec("ROLLBACK"); throw error }
             } else {
                 let version = try scalar("PRAGMA user_version")
-                guard version == 1 else { throw HistoryError.newerSchema }
+                guard version == 1 || version == 2 else { throw HistoryError.newerSchema }
+                appearanceAvailable = version == 2
             }
         } catch { sqlite3_close(handle); handle = nil; throw error }
     }
@@ -152,16 +171,36 @@ final class SharedDatabase {
             let days = Int(try textScalar("SELECT COALESCE((SELECT Value FROM Settings WHERE Key='retention'),'0')") ?? "0") ?? 0
             let cutoff = days > 0 ? Int64(now.timeIntervalSince1970 * 1000) - Int64(days) * 86_400_000 : Int64.min
             let count = Int(try scalar("SELECT COUNT(*) FROM Notifications WHERE ReceivedAt>=\(max(start, cutoff)) AND ReceivedAt<\(end)"))
-            let statement = try prepare("SELECT Id,substr(SourceApp,1,100),substr(Title,1,200),substr(Subtitle,1,200),substr(Body,1,200),ReceivedAt FROM Notifications WHERE ReceivedAt>=\(cutoff) ORDER BY ReceivedAt DESC,Id DESC LIMIT 3")
+            let statement = try prepare("SELECT Id,substr(SourceApp,1,100),substr(Title,1,200),substr(Subtitle,1,200),substr(Body,1,200),ReceivedAt,CASE WHEN length(SourceApp)<=160 THEN SourceApp ELSE NULL END FROM Notifications WHERE ReceivedAt>=\(cutoff) ORDER BY ReceivedAt DESC,Id DESC LIMIT 3")
             defer { sqlite3_finalize(statement) }
             var rows: [CapturedNotification] = []
             var status = sqlite3_step(statement)
             while status == SQLITE_ROW {
-                rows.append(CapturedNotification(id: sqlite3_column_int64(statement, 0), source: text(statement, 1), title: text(statement, 2), subtitle: text(statement, 3), body: text(statement, 4), receivedAt: sqlite3_column_int64(statement, 5)))
+                let source = text(statement, 1)
+                rows.append(CapturedNotification(id: sqlite3_column_int64(statement, 0), source: source, title: text(statement, 2), subtitle: text(statement, 3), body: text(statement, 4), receivedAt: sqlite3_column_int64(statement, 5), appearance: try appearance(for: text(statement, 6))))
                 status = sqlite3_step(statement)
             }
             guard status == SQLITE_DONE else { throw HistoryError.database }
             try exec("COMMIT"); return (count, rows)
         } catch { try? exec("ROLLBACK"); throw error }
+    }
+    private func appearance(for source: String?) throws -> NotificationAppearance? {
+        guard appearanceAvailable, let source else { return nil }
+        let statement = try prepare("SELECT DisplayName,BackgroundColor,GradientColor,UseGradient,TitleColor,BodyColor,AutoTextColor,ImageFile,IconShape FROM AppProfiles WHERE SourceKey=?")
+        defer { sqlite3_finalize(statement) }
+        try bind(source.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(), to: statement, at: 1)
+        let result = sqlite3_step(statement)
+        if result == SQLITE_DONE { return nil }
+        guard result == SQLITE_ROW else { throw HistoryError.database }
+        var imagePath: String?
+        if let file = text(statement, 7), file.count == 41, file.hasSuffix("-icon.png"),
+           file.prefix(32).allSatisfy({ $0.isHexDigit }), let directory = iconDirectory {
+            imagePath = directory.appendingPathComponent(file).path
+        }
+        return NotificationAppearance(displayName: text(statement, 0) ?? source,
+            background: text(statement, 1) ?? "#242426", gradient: text(statement, 2) ?? "#171719",
+            useGradient: sqlite3_column_int(statement, 3) != 0,
+            titleColor: text(statement, 4) ?? "#FFFFFF", bodyColor: text(statement, 5) ?? "#FFFFFF",
+            autoText: sqlite3_column_int(statement, 6) != 0, imagePath: imagePath, circle: text(statement, 8) == "Circle")
     }
 }
