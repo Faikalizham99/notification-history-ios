@@ -13,12 +13,14 @@ public sealed class SettingsPage : ContentPage
     {
         this.services = services; vm = new(services); BindingContext = vm; Title = "Settings";
         var stack = new VerticalStackLayout { Padding = 24, Spacing = 18 };
-        stack.Add(new Label { Text = "Storage", FontSize = 24, FontAttributes = FontAttributes.Bold }); stack.Add(retention);
+        stack.Add(new Label { Text = "Storage", FontSize = 24, FontAttributes = FontAttributes.Bold });
+        stack.Add(AppearanceUI.Caption("Keep history")); stack.Add(AppearanceUI.Selector(retention));
         stack.Add(new Label { Text = "Retention also removes favorites. Cleanup runs when history opens and whenever a notification is saved.", FontSize = 14 });
         retention.SelectedIndexChanged += async (_, _) => { if (ready && retention.SelectedIndex >= 0) await Run(() => vm.SetRetentionAsync(retention.SelectedIndex)); };
         var clear = new Button { Text = "Clear all history", BackgroundColor = Color.FromArgb("#C43C35") };
         clear.Clicked += async (_, _) => await Run(async () => { if (await AppServices.ConfirmAsync("Clear all history?", "All notifications, including favorites, will be permanently removed.")) await vm.ClearAsync(); }); stack.Add(clear);
-        stack.Add(new Label { Text = "Appearance", FontSize = 24, FontAttributes = FontAttributes.Bold }); stack.Add(appearance);
+        stack.Add(new Label { Text = "Appearance", FontSize = 24, FontAttributes = FontAttributes.Bold });
+        stack.Add(AppearanceUI.Caption("Theme")); stack.Add(AppearanceUI.Selector(appearance));
         var apps = new Button { Text = "App photos and colors" };
         apps.Clicked += async (_, _) => await Navigation.PushAsync(new AppsPage(services)); stack.Add(apps);
         var setup = new Button { Text = "Shortcut setup" };

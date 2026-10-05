@@ -33,6 +33,25 @@ internal static class AppearanceUI
             StrokeShape = new RoundRectangle { CornerRadius = 20 } };
         panel.SetAppThemeColor(VisualElement.BackgroundColorProperty, Colors.White, Color.FromArgb("#1C1C1E")); return panel;
     }
+    public static Border ValueBox(View content, Thickness? padding = null)
+    {
+        var box = new Border { Content = content, Padding = padding ?? new Thickness(14), MinimumHeightRequest = 52,
+            StrokeThickness = 1.5, StrokeShape = new RoundRectangle { CornerRadius = 12 } };
+        box.SetAppThemeColor(VisualElement.BackgroundColorProperty, Colors.White, Color.FromArgb("#202024"));
+        box.SetAppTheme<Brush>(Border.StrokeProperty, new SolidColorBrush(Color.FromArgb("#B7B7C2")), new SolidColorBrush(Color.FromArgb("#686873"))); return box;
+    }
+    public static Border Selector(Picker picker)
+    {
+        picker.SetAppThemeColor(Picker.TextColorProperty, Color.FromArgb("#1C1C1E"), Colors.White);
+        picker.SetAppThemeColor(Picker.TitleColorProperty, Color.FromArgb("#62626B"), Color.FromArgb("#A4A4AD"));
+        picker.BackgroundColor = Colors.Transparent; picker.MinimumHeightRequest = 48;
+        var row = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, ColumnSpacing = 8 };
+        row.Add(picker);
+        var arrow = Text("⌄", 23, true); arrow.VerticalOptions = LayoutOptions.Center; arrow.InputTransparent = true; row.Add(arrow, 1);
+        var box = ValueBox(row, new Thickness(14, 4));
+        var tap = new TapGestureRecognizer(); tap.Tapped += (_, _) => picker.Focus(); box.GestureRecognizers.Add(tap);
+        SemanticProperties.SetHint(picker, "Tap to choose " + picker.Title.ToLowerInvariant()); return box;
+    }
     public static Grid Header(Button left, string title, Button? right = null)
     {
         var header = new Grid { ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) }, ColumnSpacing = 8 };

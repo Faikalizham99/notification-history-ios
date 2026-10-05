@@ -37,6 +37,14 @@ try
 {
     SigningTests.Run(Path.Combine(directory, "signing"));
     await AppearanceTests.RunAsync(directory);
+    var malaysia = new DateTimeOffset(2026, 10, 5, 13, 26, 7, TimeSpan.Zero).ToOffset(TimeSpan.FromHours(8));
+    var malaysiaCulture = (System.Globalization.CultureInfo)System.Globalization.CultureInfo.GetCultureInfo("en-MY").Clone();
+    malaysiaCulture.DateTimeFormat.LongTimePattern = "h:mm:ss tt";
+    malaysiaCulture.DateTimeFormat.AMDesignator = "AM"; malaysiaCulture.DateTimeFormat.PMDesignator = "PM";
+    Check(NotificationTimes.Detail(malaysia, malaysiaCulture) == "9:26:07 PM (UTC+08:00)",
+        "Notification details show Malaysian local hours, minutes, seconds and UTC offset");
+    Check(NotificationTimes.Detail(malaysia.ToOffset(TimeSpan.FromHours(-4)), System.Globalization.CultureInfo.InvariantCulture) == "09:26:07 (UTC-04:00)",
+        "Notification detail time retains the selected device offset rather than forcing Malaysia");
     var path = Path.Combine(directory, "history.sqlite3"); var db = new NotificationDatabase(path);
     var now = DateTimeOffset.UtcNow;
     var body = "Bro tomorrow jadi? 👋 明天见\n100% _ literal ' quote" + new string('x', 30000);

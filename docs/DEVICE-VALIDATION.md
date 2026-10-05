@@ -26,8 +26,10 @@ These checks need a signed build on an actual iOS 27 iPhone. They have not been 
 1. Use the Debug configuration’s Development tools to insert records for today, yesterday, and an older date. Confirm grouping, scrolling, detail navigation, individual-field copy, and full-notification copy.
 2. Search English, Malay, Chinese, emoji, an apostrophe, `%`, and `_`. Combine favorites, app, and date filters and reset them individually. Check that rapid typing does not show results for a previous query.
 3. Favorite, unfavorite, delete, and clear. Return to the list and confirm the current state. Cancel the deletion confirmations and confirm no change.
+   Confirm detail field captions sit above outlined read-only value boxes, empty fields show Not provided, and tapping any provided value or its Copy indicator copies the exact value. In Malaysia, the time must include actual hours/minutes/seconds and UTC+08:00, following the phone's time format. Check both 12- and 24-hour formats.
 4. Set each retention choice. Insert older entries, including a favorite, and verify cutoff behavior. Restore Never for permanent history.
 5. Change System, Light, and Dark, relaunch, and verify persistence. Check smallest supported screen, landscape, safe areas, VoiceOver labels, and large text. Review the screen recording or screenshots for clipped controls.
+   Settings retention and theme selectors must have visible outlines and dropdown arrows in each theme. Tap both the selected value and the surrounding selector to open its choices.
 6. Use at least 10,000 synthetic notifications to assess incremental loading and search latency on the target phone. Confirm scrolling memory stays bounded by displayed pages and body previews; clear afterward.
 
 ## App appearance and photo cropping
