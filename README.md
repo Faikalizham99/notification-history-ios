@@ -63,6 +63,8 @@ Input fields share a visible outline in both themes, with a teal focus outline w
 
 History cards open through tap gestures instead of native row selection, preventing the gray selection rectangle on a held card. Collection views default to no selection app-wide. Card tapping, scrolling, pull-to-refresh, and incremental loading remain available.
 
+Swipe a history card left to reveal **Delete**, then tap it and confirm. Cancel keeps the notification. Deleting refreshes history and requests a widget update; the existing delete action in notification details remains available. Only one card's swipe stays open at a time.
+
 Persistence uses WAL, `synchronous=FULL`, a 5-second busy timeout, prepared parameters, short-lived connections, explicit insert/cleanup transactions, and automatic checkpoints. The widget reads its count and three rows in one short read transaction. It does not write, migrate, or continuously execute. Save failures propagate to Shortcuts; there is no guaranteed OS-level retry. Do not remove `-wal` or `-shm` files from a live database or copy only the main file for backup. [SQLite WAL documentation](https://sqlite.org/wal.html).
 
 On Apple platforms, C# and Swift also acquire the same POSIX `flock` before opening a writable connection and release it after closing that connection. This serializes writes and close-time checkpoints across processes, protecting older system engines against the documented WAL-reset race. The OS releases locks after a process crash; a leftover `.lock` file is harmless. Read-only widget connections need no writer lock and can read during saves. The lock wait is bounded to five seconds. [SQLite race details](https://sqlite.org/wal.html#walreset).

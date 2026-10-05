@@ -25,9 +25,16 @@
     <CollectionView.EmptyView><VerticalStackLayout Padding="24,60" Spacing="12"><Label Text="A little peace of mind" FontSize="24" HorizontalTextAlignment="Center" /><Label Text="Saved notifications will appear here. Set up a Shortcut to start capturing." HorizontalTextAlignment="Center" /></VerticalStackLayout></CollectionView.EmptyView>
     <CollectionView.GroupHeaderTemplate><DataTemplate x:DataType="vm:NotificationGroup"><Label Text="{Binding Title}" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#636366, Dark=#AEAEB2}" Padding="4,18,4,8" /></DataTemplate></CollectionView.GroupHeaderTemplate>
     <CollectionView.ItemTemplate><DataTemplate x:DataType="vm:NotificationCardModel">
-     <views:NotificationCardView Margin="0,0,0,12" SemanticProperties.Hint="Tap to open notification">
-      <views:NotificationCardView.GestureRecognizers><TapGestureRecognizer Tapped="OnCardTapped" /></views:NotificationCardView.GestureRecognizers>
-     </views:NotificationCardView>
+     <SwipeView Margin="0,0,0,12" BackgroundColor="Transparent" SwipeStarted="OnSwipeStarted" SwipeEnded="OnSwipeEnded">
+      <SwipeView.RightItems>
+       <SwipeItems Mode="Reveal" SwipeBehaviorOnInvoked="Close">
+        <SwipeItem Text="Delete" BackgroundColor="#C43C35" CommandParameter="{Binding Entry.Id}" Invoked="OnSwipeDelete" />
+       </SwipeItems>
+      </SwipeView.RightItems>
+      <views:NotificationCardView SemanticProperties.Hint="Tap to open notification. Swipe left to reveal Delete.">
+       <views:NotificationCardView.GestureRecognizers><TapGestureRecognizer Tapped="OnCardTapped" /></views:NotificationCardView.GestureRecognizers>
+      </views:NotificationCardView>
+     </SwipeView>
     </DataTemplate></CollectionView.ItemTemplate>
    </CollectionView>
   </RefreshView>
