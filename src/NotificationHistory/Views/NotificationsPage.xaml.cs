@@ -53,7 +53,7 @@ public partial class NotificationsPage : ContentPage
     }
     private async void OnSwipeDelete(object? sender, EventArgs e)
     {
-        if (openingNotification || deletingNotification || sender is not SwipeItem { CommandParameter: long id } || id <= 0) return;
+        if (openingNotification || deletingNotification || sender is not SwipeItemView { CommandParameter: long id } || id <= 0) return;
         deletingNotification = true; CloseSwipe();
         try
         {

@@ -38,8 +38,14 @@ public sealed class NotificationCardView : ContentView
             TextColor = titleColor, MaxLines = 2, LineBreakMode = LineBreakMode.TailTruncation, AutomationId = "CardTitle" });
         var hasSubtitle = !string.IsNullOrWhiteSpace(card.Entry.Subtitle);
         if (hasSubtitle)
-            text.Add(new Label { Text = card.Entry.Subtitle, FontSize = 15, TextColor = bodyColor, MaxLines = 2,
-                LineBreakMode = LineBreakMode.TailTruncation, AutomationId = "CardSubtitle" });
+        {
+            var subtitle = new Label { Text = card.Entry.Subtitle, FontSize = 13, FontAttributes = FontAttributes.Bold,
+                TextColor = bodyColor, MaxLines = 2, LineBreakMode = LineBreakMode.TailTruncation, AutomationId = "CardSubtitle" };
+            SemanticProperties.SetDescription(subtitle, "Subtitle: " + card.Entry.Subtitle);
+            text.Add(new Border { Content = subtitle, HorizontalOptions = LayoutOptions.Start, Padding = new Thickness(8, 3),
+                BackgroundColor = bodyColor.WithAlpha(.10f), Stroke = new SolidColorBrush(bodyColor.WithAlpha(.25f)),
+                StrokeThickness = 1, StrokeShape = new RoundRectangle { CornerRadius = 8 } });
+        }
         // Preview falls back to the subtitle for other consumers; don't repeat it on this card.
         if (!string.IsNullOrWhiteSpace(card.Entry.Body) || !hasSubtitle)
             text.Add(new Label { Text = card.Entry.Preview, FontSize = 16, TextColor = bodyColor, MaxLines = 3,

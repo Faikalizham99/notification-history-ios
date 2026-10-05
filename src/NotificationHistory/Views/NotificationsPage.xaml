@@ -13,7 +13,7 @@
    <Button x:Name="DateButton" Grid.Column="2" Text="Any date" FontSize="13" Clicked="OnDate" />
   </Grid>
   <ScrollView Grid.Row="2" x:Name="AppBadgeScroll" Orientation="Horizontal" IsVisible="{Binding HasAppBadges}" HorizontalScrollBarVisibility="Default">
-   <HorizontalStackLayout x:Name="AppBadgeRow" Spacing="8" BindableLayout.ItemsSource="{Binding AppBadges}">
+   <HorizontalStackLayout x:Name="AppBadgeRow" Padding="4,2,4,8" Spacing="8" BindableLayout.ItemsSource="{Binding AppBadges}">
     <BindableLayout.ItemTemplate><DataTemplate x:DataType="vm:AppBadgeModel">
      <views:AppBadgeView>
       <views:AppBadgeView.GestureRecognizers><TapGestureRecognizer Tapped="OnBadgeTapped" /></views:AppBadgeView.GestureRecognizers>
@@ -32,12 +32,20 @@
    <CollectionView ItemsSource="{Binding Groups}" IsGrouped="True" SelectionMode="None"
      RemainingItemsThreshold="12" RemainingItemsThresholdReached="OnLoadMore">
     <CollectionView.EmptyView><VerticalStackLayout Padding="24,60" Spacing="12"><Label Text="A little peace of mind" FontSize="24" HorizontalTextAlignment="Center" /><Label Text="{Binding EmptyMessage}" HorizontalTextAlignment="Center" /></VerticalStackLayout></CollectionView.EmptyView>
-    <CollectionView.GroupHeaderTemplate><DataTemplate x:DataType="vm:NotificationGroup"><Label Text="{Binding Title}" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#636366, Dark=#AEAEB2}" Padding="4,18,4,8" /></DataTemplate></CollectionView.GroupHeaderTemplate>
+    <CollectionView.GroupHeaderTemplate><DataTemplate x:DataType="vm:NotificationGroup"><Label Text="{Binding Title}" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#636366, Dark=#AEAEB2}" Padding="12,18,16,8" /></DataTemplate></CollectionView.GroupHeaderTemplate>
     <CollectionView.ItemTemplate><DataTemplate x:DataType="vm:NotificationCardModel">
-     <SwipeView Margin="0,0,0,12" BackgroundColor="Transparent" SwipeStarted="OnSwipeStarted" SwipeEnded="OnSwipeEnded">
+     <SwipeView Margin="8,0,12,12" BackgroundColor="Transparent" SwipeStarted="OnSwipeStarted" SwipeEnded="OnSwipeEnded">
       <SwipeView.RightItems>
        <SwipeItems Mode="Reveal" SwipeBehaviorOnInvoked="Close">
-        <SwipeItem Text="Delete" BackgroundColor="#C43C35" CommandParameter="{Binding Entry.Id}" Invoked="OnSwipeDelete" />
+        <SwipeItemView WidthRequest="112" Padding="8,0,0,0" BackgroundColor="Transparent"
+          CommandParameter="{Binding Entry.Id}" Invoked="OnSwipeDelete"
+          SemanticProperties.Description="Delete notification" SemanticProperties.Hint="Opens a deletion confirmation.">
+         <Border BackgroundColor="#C43C35" StrokeThickness="0" Padding="12" InputTransparent="True">
+          <Border.StrokeShape><RoundRectangle CornerRadius="20" /></Border.StrokeShape>
+          <Label Text="Delete" TextColor="White" FontSize="16" FontAttributes="Bold"
+            HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
+         </Border>
+        </SwipeItemView>
        </SwipeItems>
       </SwipeView.RightItems>
       <views:NotificationCardView SemanticProperties.Hint="Tap to open notification. Swipe left to reveal Delete.">
