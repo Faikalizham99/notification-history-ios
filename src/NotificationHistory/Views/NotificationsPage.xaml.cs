@@ -45,7 +45,12 @@ public partial class NotificationsPage : ContentPage
         if (openingNotification || deletingNotification || sender is not View { BindingContext: NotificationCardModel card }) return;
         if (openSwipe is not null) { CloseSwipe(); return; }
         openingNotification = true;
-        try { await services.OpenDetailAsync(card.Entry.Id); }
+        try
+        {
+            if (sender is NotificationCardView view && await view.TryToggleBodyAsync(e, services.Database.GetAsync)) return;
+            await services.OpenDetailAsync(card.Entry.Id);
+        }
+        catch (Exception error) { await AppServices.StorageAlertAsync(error, "Unable to expand message", "Could not read the full message. Please try again."); }
         finally { openingNotification = false; }
     }
     private void CloseSwipe() { var swipe = openSwipe; openSwipe = null; swipe?.Close(); }

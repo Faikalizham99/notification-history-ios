@@ -58,6 +58,22 @@ try
             "Darwin shared writer lock uses owner-only permissions");
     }
     Check((await db.GetAsync(id))?.Body == body, "Unicode, multiline and long body round trip");
+    var bodyPreview = (await db.QueryAsync(new(Source: "App & 🐈"))).Single();
+    Check(bodyPreview.Body is not null && bodyPreview.Body.Length < body.Length &&
+        body.StartsWith(bodyPreview.Body, StringComparison.Ordinal) && bodyPreview.Preview.EndsWith("…", StringComparison.Ordinal),
+        "Bounded list previews indicate a longer body while detail reads preserve the complete message");
+    foreach (var sample in new[] {
+        (Body: new string('x', 180), Preview: new string('x', 180)),
+        (Body: new string('x', 181), Preview: new string('x', 180) + "…"),
+        (Body: "The sender wrote...", Preview: "The sender wrote..."),
+        (Body: "The sender wrote…", Preview: "The sender wrote…"),
+        (Body: new string('x', 179) + "👋tail", Preview: new string('x', 179) + "…") })
+    {
+        var sampleId = await db.SaveAsync(new() { SourceApp = "Preview boundaries", Body = sample.Body });
+        var previewEntry = (await db.QueryAsync(new(Source: "Preview boundaries"), limit: 1)).Single();
+        Check(previewEntry.Id == sampleId && previewEntry.Preview == sample.Preview && (await db.GetAsync(sampleId))?.Body == sample.Body,
+            "Preview boundaries distinguish complete text, literal ellipses and truncated Unicode without losing the full body");
+    }
     var partial = await db.SaveAsync(new() { SourceApp = "Some App" });
     Check((await db.GetAsync(partial))?.Title is null, "Partial fields accepted");
     Check((await db.QueryAsync(new(Search: "100% _ literal"))).Count == 1, "LIKE wildcards escaped");

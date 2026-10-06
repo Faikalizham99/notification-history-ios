@@ -107,7 +107,9 @@ public sealed class NotificationDatabase
             args.Add(cursor.ReceivedAt); args.Add(cursor.ReceivedAt); args.Add(cursor.Id);
         }
         args.Add(Math.Clamp(limit, 1, 200));
-        return db.Query<NotificationEntry>("SELECT Id,SourceApp,Title,Subtitle,substr(Body,1,180) AS Body,ReceivedAt,CreatedAt,IsFavorite,IsRead,CaptureId FROM Notifications" + (clauses.Count > 0 ? " WHERE " + string.Join(" AND ", clauses) : "") +
+        // One extra character lets the preview distinguish a complete body from a longer message.
+        // The full body is fetched by ID only when the user expands it or opens details.
+        return db.Query<NotificationEntry>("SELECT Id,SourceApp,Title,Subtitle,substr(Body,1,181) AS Body,ReceivedAt,CreatedAt,IsFavorite,IsRead,CaptureId FROM Notifications" + (clauses.Count > 0 ? " WHERE " + string.Join(" AND ", clauses) : "") +
       " ORDER BY ReceivedAt DESC, Id DESC LIMIT ?", args.ToArray());
     }, token);
     public Task<NotificationEntry?> GetAsync(long id) => Run<NotificationEntry?>(db => db.Find<NotificationEntry>(id));

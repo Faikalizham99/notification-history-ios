@@ -64,7 +64,7 @@
         </SwipeItemView>
        </SwipeItems>
       </SwipeView.RightItems>
-      <views:NotificationCardView SemanticProperties.Hint="Tap to open notification. Swipe left to reveal Delete.">
+      <views:NotificationCardView SemanticProperties.Hint="Tap a truncated message to expand or collapse. Tap elsewhere to open notification. Swipe left to reveal Delete.">
        <views:NotificationCardView.GestureRecognizers><TapGestureRecognizer Tapped="OnCardTapped" /></views:NotificationCardView.GestureRecognizers>
       </views:NotificationCardView>
      </SwipeView>

@@ -17,7 +17,7 @@ public sealed class NotificationEntry
     [Ignore] public DateTimeOffset ReceivedDate => DateTimeOffset.FromUnixTimeMilliseconds(ReceivedAt).ToLocalTime();
     [Ignore] public string SourceDisplay => string.IsNullOrWhiteSpace(SourceApp) ? "Unknown app" : SourceApp;
     [Ignore] public string TitleDisplay => string.IsNullOrWhiteSpace(Title) ? "Notification" : Title;
-    [Ignore] public string Preview => !string.IsNullOrWhiteSpace(Body) ? Body is { Length: > 180 } ? Body[..180] + "…" : Body
+    [Ignore] public string Preview => !string.IsNullOrWhiteSpace(Body) ? Body is { Length: > 180 } ? Body[..(char.IsHighSurrogate(Body[179]) ? 179 : 180)] + "…" : Body
         : !string.IsNullOrWhiteSpace(Subtitle) ? Subtitle : "No message provided";
     [Ignore] public string TimeDisplay => ReceivedDate.ToString("t");
     [Ignore] public string FavoriteDisplay => IsFavorite ? "★" : "";

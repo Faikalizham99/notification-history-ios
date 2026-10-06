@@ -1,14 +1,24 @@
 using Microsoft.Maui.Controls.Shapes;
+using NotificationHistory.Core.Models;
 using NotificationHistory.Core.Services;
+using NotificationHistory.Services;
 using NotificationHistory.ViewModels;
 namespace NotificationHistory.Views;
 
 // This is used unchanged by both history rows and the live appearance preview.
 public sealed class NotificationCardView : ContentView
 {
+    private Label? message;
+
     protected override void OnBindingContextChanged()
     {
         base.OnBindingContextChanged();
+        if (message is not null)
+        {
+            message.SizeChanged -= OnMessageLayoutChanged;
+            message.HandlerChanged -= OnMessageLayoutChanged;
+        }
+        message = null;
         if (BindingContext is not NotificationCardModel card) { Content = null; return; }
         var profile = card.Profile;
         var automatic = AppearanceColors.AutomaticText(profile.BackgroundColor, profile.UseGradient ? profile.GradientColor : null);
@@ -48,10 +58,86 @@ public sealed class NotificationCardView : ContentView
         }
         // Preview falls back to the subtitle for other consumers; don't repeat it on this card.
         if (!string.IsNullOrWhiteSpace(card.Entry.Body) || !hasSubtitle)
-            text.Add(new Label { Text = card.Entry.Preview, FontSize = 16, TextColor = bodyColor, MaxLines = 3,
-                LineBreakMode = LineBreakMode.TailTruncation, AutomationId = "CardMessage" });
+        {
+            message = new Label { FontSize = 16, TextColor = bodyColor, AutomationId = "CardMessage" };
+            ApplyMessageState(card);
+            message.SizeChanged += OnMessageLayoutChanged;
+            message.HandlerChanged += OnMessageLayoutChanged;
+            text.Add(message);
+        }
         grid.Add(text, 1);
         Content = new Border { Padding = 14, StrokeThickness = 0, Background = background,
             StrokeShape = new RoundRectangle { CornerRadius = 20 }, Content = grid };
+    }
+
+    // Route body and detail taps through the existing card gesture. Separate child
+    // gestures can compete with the card tap and swipe-to-delete on iOS.
+    public async Task<bool> TryToggleBodyAsync(TappedEventArgs tap, Func<long, Task<NotificationEntry?>> load)
+    {
+        if (message is not { } label || BindingContext is not NotificationCardModel card ||
+            string.IsNullOrWhiteSpace(card.Entry.Body)) return false;
+        var position = tap.GetPosition(label);
+        if (position is not { } point || point.X < 0 || point.Y < 0 ||
+            point.X > label.Width || point.Y > label.Height ||
+            card.ExpandedBody is null && !IsMessageTruncated(card)) return false;
+
+        if (card.ExpandedBody is not null)
+        {
+            card.ExpandedBody = null;
+            ApplyMessageState(card);
+            SemanticScreenReader.Announce("Message collapsed");
+            return true;
+        }
+
+        var fullEntry = card.Entry.Id > 0 ? await load(card.Entry.Id) : card.Entry;
+        // A filter change or reload may recycle the view while the read is pending.
+        if (!ReferenceEquals(BindingContext, card) || !ReferenceEquals(message, label)) return true;
+        if (fullEntry is null)
+        {
+            await AppServices.AlertAsync("Notification unavailable", "It may have been deleted or removed by retention.");
+            return true;
+        }
+        if (string.IsNullOrWhiteSpace(fullEntry.Body)) return true;
+        card.ExpandedBody = fullEntry.Body;
+        ApplyMessageState(card);
+        SemanticScreenReader.Announce("Message expanded");
+        return true;
+    }
+
+    private bool IsMessageTruncated(NotificationCardModel card)
+    {
+        if (message is null || string.IsNullOrWhiteSpace(card.Entry.Body)) return false;
+        // This detects our shortened preview, not a literal ellipsis in the sender's message.
+        if (!string.Equals(card.Entry.Body, card.Entry.Preview, StringComparison.Ordinal)) return true;
+#if IOS
+        if (message.Width > 0 && message.Height > 0 && message.Handler?.PlatformView is UIKit.UILabel native)
+        {
+            var fullBounds = native.TextRectForBounds(new CoreGraphics.CGRect(0, 0, message.Width, 100000), IntPtr.Zero);
+            return fullBounds.Height > message.Height + 0.5;
+        }
+#endif
+        return false;
+    }
+
+    private void ApplyMessageState(NotificationCardModel card)
+    {
+        if (message is null) return;
+        var expanded = card.ExpandedBody is not null;
+        message.Text = card.ExpandedBody ?? card.Entry.Preview;
+        message.MaxLines = expanded ? -1 : 3;
+        message.LineBreakMode = expanded ? LineBreakMode.WordWrap : LineBreakMode.TailTruncation;
+        UpdateMessageHint(card);
+    }
+
+    private void OnMessageLayoutChanged(object? sender, EventArgs e)
+    {
+        if (BindingContext is NotificationCardModel card) UpdateMessageHint(card);
+    }
+
+    private void UpdateMessageHint(NotificationCardModel card)
+    {
+        if (message is not null)
+            SemanticProperties.SetHint(message, card.ExpandedBody is not null ? "Tap message to collapse." :
+                IsMessageTruncated(card) ? "Tap message to expand." : "");
     }
 }
