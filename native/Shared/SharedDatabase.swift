@@ -286,7 +286,7 @@ final class SharedDatabase {
             let selected = apps.first(where: { $0.key == navigation.selectedSourceKey })
             var rows: [CapturedNotification] = []
             if let selected, selected.count > 0 {
-                let statement = try prepare("SELECT Id,substr(SourceApp,1,100),substr(Title,1,200),substr(Subtitle,1,200),substr(Body,1,200),ReceivedAt FROM Notifications WHERE ReceivedAt>=? AND nh_source_key(SourceApp)=? ORDER BY ReceivedAt DESC,Id DESC LIMIT ? OFFSET ?")
+                let statement = try prepare("SELECT Id,substr(SourceApp,1,100),substr(Title,1,200),substr(Subtitle,1,200),substr(Body,1,1024),ReceivedAt FROM Notifications WHERE ReceivedAt>=? AND nh_source_key(SourceApp)=? ORDER BY ReceivedAt DESC,Id DESC LIMIT ? OFFSET ?")
                 defer { sqlite3_finalize(statement) }
                 sqlite3_bind_int64(statement, 1, cutoff); try bind(selected.key, to: statement, at: 2)
                 sqlite3_bind_int64(statement, 3, Int64(layout.notificationPageSize))

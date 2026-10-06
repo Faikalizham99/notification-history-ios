@@ -10,7 +10,7 @@ enum WidgetStorageTests {
             for app in 0..<10 {
                 for item in 0..<4 {
                     _ = try writer.save(source: String(format: "App %02d", app), title: "Title \(item)", subtitle: "Work",
-                        body: String(repeating: "Message 👋 ", count: 40), receivedAt: now.addingTimeInterval(Double(item)))
+                        body: String(repeating: "Message 👋 ", count: 160), receivedAt: now.addingTimeInterval(Double(item)))
                 }
             }
             _ = try writer.save(source: " app 00 \n", title: "Variant", subtitle: nil, body: "Case and whitespace", receivedAt: now)
@@ -30,7 +30,7 @@ enum WidgetStorageTests {
         var page = try read()
         guard page.appCount == 13, page.apps.count == 4, page.selectedApp?.key == "APP 00",
               page.selectedApp?.count == 5, page.notifications.count == 2, page.badgePageCount == 4,
-              page.notifications.allSatisfy({ ($0.body?.count ?? 0) <= 200 && $0.subtitle == "Work" }) else {
+              page.notifications.allSatisfy({ (201...1024).contains($0.body?.count ?? 0) && $0.subtitle == "Work" }) else {
             fatalError("Widget first-app selection, normalized counts, retention, or bounded previews differ")
         }
         let firstIDs = Set(page.notifications.map(\.id))

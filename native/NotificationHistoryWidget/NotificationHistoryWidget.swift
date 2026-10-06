@@ -187,7 +187,7 @@ private struct HistoryWidgetView: View {
                             if index < snapshot.notifications.count {
                                 let item = snapshot.notifications[index]
                                 Link(destination: item.url) {
-                                    NotificationCard(item: item, height: height)
+                                    NotificationCard(item: item)
                                 }.buttonStyle(.plain).frame(maxWidth: .infinity, maxHeight: .infinity)
                                     .accessibilityLabel("\(item.titleDisplay). \(item.preview). Open notification")
                                     .privacySensitive()
@@ -254,7 +254,6 @@ private struct AppBadge: View {
 
 private struct NotificationCard: View {
     let item: CapturedNotification
-    let height: CGFloat
     private var appearance: NotificationAppearance { item.appearance ?? .defaultProfile(for: item.source ?? "") }
     private var colors: AppearancePalette { AppearancePalette(appearance) }
     private var subtitle: String? { item.subtitle.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 } }
@@ -272,18 +271,30 @@ private struct NotificationCard: View {
                     Spacer(minLength: 0)
                     Text(Date(timeIntervalSince1970: Double(item.receivedAt) / 1000).formatted(date: .omitted, time: .shortened))
                         .font(.system(size: 10, weight: .medium)).foregroundStyle(colors.timestamp).lineLimit(1).privacySensitive()
-                }
+                }.fixedSize(horizontal: false, vertical: true)
                 if let subtitle {
                     Text(subtitle).font(.system(size: 11, weight: .semibold)).foregroundStyle(colors.body)
                         .lineLimit(1).padding(.horizontal, 6).padding(.vertical, 2)
                         .background(colors.body.opacity(0.1), in: Capsule())
-                        .overlay(Capsule().strokeBorder(colors.body.opacity(0.22), lineWidth: 0.8)).privacySensitive()
+                        .overlay(Capsule().strokeBorder(colors.body.opacity(0.22), lineWidth: 0.8))
+                        .fixedSize(horizontal: false, vertical: true).privacySensitive()
                 }
                 if let bodyText {
-                    Text(bodyText).font(.system(size: 13)).foregroundStyle(colors.body)
-                        .lineLimit(height >= 120 ? 3 : height >= 100 ? 2 : 1).privacySensitive()
+                    GeometryReader { geometry in
+                        // The title and optional subtitle keep their own height. Use the
+                        // remaining body space for as many complete lines as will fit.
+                        let font = UIFont.systemFont(ofSize: 13)
+                        let availableHeight = max(0, geometry.size.height)
+                        if availableHeight >= font.lineHeight {
+                            Text(bodyText).font(Font(font)).foregroundStyle(colors.body)
+                                .lineLimit(max(1, Int((availableHeight / font.lineHeight).rounded(.down))))
+                                .truncationMode(.tail)
+                                .frame(width: geometry.size.width, height: availableHeight, alignment: .topLeading)
+                                .privacySensitive()
+                        }
+                    }
                 }
-            }.frame(maxWidth: .infinity, alignment: .leading)
+            }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }.padding(10).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(colors.gradient, in: RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(colors.title.opacity(0.1), lineWidth: 0.8))
