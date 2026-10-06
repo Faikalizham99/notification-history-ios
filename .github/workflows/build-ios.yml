@@ -13,7 +13,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  widget:
+    # The iOS 27 portrait family is native-only; keep MAUI on its matching Xcode 26.4.
+    if: >
+      github.event_name == 'push' &&
+      github.ref_type == 'tag' &&
+      github.event.created == true &&
+      github.event.deleted == false &&
+      github.run_attempt == '1'
+    runs-on: xcode-27
+    timeout-minutes: 25
+    env:
+      CONFIGURATION: Release
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve matching widget version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          version="${REF_NAME#v}"
+          if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Invalid version" >&2
+            exit 1
+          fi
+          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
+          counter=$((GITHUB_RUN_NUMBER * 1000 + GITHUB_RUN_ATTEMPT))
+          echo "BUILD_NUMBER=$((counter / 10000 + 1)).$((counter / 100 % 100)).$((counter % 100))" >> "$GITHUB_ENV"
+      - name: Select Xcode 27 for widget
+        run: |
+          test -d /Applications/Xcode_27.0.app
+          echo "DEVELOPER_DIR=/Applications/Xcode_27.0.app/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Build widget with Extra-large Portrait
+        run: |
+          if ! command -v xcodegen >/dev/null; then
+            brew install xcodegen
+          fi
+          bash scripts/build-widget.sh
+      - name: Verify widget handoff logic
+        run: python3 -m unittest discover -s tests -p 'test_widget_install.py'
+      - name: Upload native widget handoff
+        uses: actions/upload-artifact@v7
+        with:
+          name: NotificationHistory-native-widget
+          path: artifacts/NotificationHistoryWidget-xcode27.tar.gz
+          archive: true
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
   build:
+    needs: widget
     # Build once when a new release tag is pushed;
     # skip tag edits/deletions and reruns.
     if: >
@@ -100,6 +148,19 @@ jobs:
       - name: Build native framework and extensions
         run: |
           bash scripts/build-native.sh
+
+      - name: Download iOS 27 widget
+        uses: actions/download-artifact@v8
+        with:
+          name: NotificationHistory-native-widget
+          path: .tmp/widget-xcode27
+
+      - name: Install matching native widget
+        run: |
+          python3 scripts/install-widget.py \
+            .tmp/widget-xcode27/NotificationHistoryWidget-xcode27.tar.gz \
+            artifacts/native/Build/Products/Release-iphoneos \
+            --version "$APP_VERSION" --build "$BUILD_NUMBER"
 
       - name: Verify native and managed storage interoperability
         run: |
@@ -278,7 +339,7 @@ jobs:
             src/NotificationHistory/Platforms/iOS/Entitlements.plist
             native/Shared/Shared.entitlements
 
-      - name: Clean temporary download check
+      - name: Clean temporary downloads
         if: always()
         run: |
-          rm -rf -- "$GITHUB_WORKSPACE/.tmp/download-check"
+          rm -rf -- "$GITHUB_WORKSPACE/.tmp/download-check" "$GITHUB_WORKSPACE/.tmp/widget-xcode27"

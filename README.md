@@ -1,6 +1,6 @@
 # Notification History
 
-An iOS-first .NET 10 MAUI app for personal notification history. It stores the optional text supplied by a Shortcut, lets you search and manage that history, and provides small and medium native widgets. It contains no global notification listener, notification-service interception, cloud sync, analytics, or network upload code.
+An iOS-first .NET 10 MAUI app for personal notification history. It stores the optional text supplied by a Shortcut, lets you search and manage that history, and provides large and extra-large interactive native widgets. It contains no global notification listener, notification-service interception, cloud sync, analytics, or network upload code.
 
 **Implementation status:** shared persistence checks pass on Windows and macOS. Native Swift framework/extension builds, concurrent Swift/.NET storage interoperability, and the Release iOS device app build have passed in GitHub Actions. Signed installation, intent discovery, widget behavior, and notification-field mappings still require validation on an iPhone. See [device acceptance checks](docs/DEVICE-VALIDATION.md).
 
@@ -18,7 +18,7 @@ Reviewed public Apple documentation on **4 October 2026**. The current guide doc
 | Can capture with MAUI closed? | Apple documents background execution in an App Intents extension. Save Notification lives in its own native extension and does not open the UI. Actual device acceptance remains pending. |
 | Separate extension required? | Apple permits intents in the main app or an extension. This project chooses the extension to keep Swift action discovery and execution independent of the MAUI process. |
 | Entitlements? | All three processes require the same authorized App Group. Data Protection is also declared. No SiriKit, push-notification, or background-monitoring entitlement is used. |
-| Shared SQLite safe? | SQLite supports concurrent local processes with WAL; one writer proceeds at a time. Transactions and a busy timeout coordinate access. The widget opens read-only. |
+| Shared SQLite safe? | SQLite supports concurrent local processes with WAL; one writer proceeds at a time. Transactions and a busy timeout coordinate access. Widget timelines open read-only; paging intents take the shared writer lock. |
 | Specific widget links? | WidgetKit supports `widgetURL` and `Link`. The main app registers a custom URL scheme and handles missing/deleted entries. |
 
 Relevant Apple references: [App Intents extensions](https://developer.apple.com/documentation/appintents/app-extension), [intent runtime behavior](https://developer.apple.com/documentation/appintents/configuring-the-runtime-behavior-of-your-app-intents), [App Groups](https://developer.apple.com/documentation/xcode/configuring-app-groups), [Data Protection](https://support.apple.com/guide/security/app-protection-and-app-groups-sec1a976c067/web), [widget links](https://developer.apple.com/documentation/widgetkit/linking-to-specific-app-scenes-from-your-widget-or-live-activity).
@@ -29,7 +29,7 @@ Relevant Apple references: [App Intents extensions](https://developer.apple.com/
 
 - .NET SDK **10.0.201**, pinned by `global.json`; MAUI Controls **10.0.20**.
 - Workload set **10.0.204.1**, `maui-ios`. Native/IPA builds require macOS and matching **Xcode 26.4/26.4.1**, plus XcodeGen (`brew install xcodegen`). The workflow resolves `/Applications/Xcode_26.4.app` to its physical directory, exports `DEVELOPER_DIR`, and checks the asset compiler before building. This avoids [.NET's asset-compiler lookup failure through an Xcode symlink](https://github.com/dotnet/macios/issues/21762). It fails if the matching Xcode is unavailable; update SDK, workload, and Xcode together when runner images change. [Runner inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-Readme.md).
-- Deployment target iOS **17+** for storage/UI/intents/widgets; the requested notification automation experience must be tested on **iOS 27**. No iOS 27-only SDK API is assumed in the code.
+- Deployment target iOS **17+** for storage/UI/intents/widgets; the requested notification automation experience must be tested on **iOS 27**. The iPhone Extra-large Portrait widget uses an iOS 27-only API behind a runtime availability check and a separate native SDK build flag.
 - Physical iPhone and a signing setup that retains extensions and authorizes App Groups. An unsigned IPA is an input to signing, not an installable app.
 - GitHub Actions enabled on this repository for macOS builds. No signing secrets are needed for the default unsigned pipeline.
 
@@ -70,7 +70,7 @@ Cards have side gutters to separate them from the scroll indicator. Provided sub
 
 App badges sit directly below the filters and remain fixed while history scrolls. Each badge uses that app's configured photo and colors and shows its total saved notification count. Scroll the badges horizontally and tap one to switch apps; the selected badge has an outline and checkmark. Apps are ordered alphabetically by display name, with the first app selected on a fresh launch. Search, favorites, date filtering, and paging apply within the selected app. Choose **All apps** in the source filter for combined history. Configured apps remain visible with zero counts after clearing history; unconfigured apps appear automatically when captured. Counts include all saved records, rather than unread records or only current search results.
 
-Persistence uses WAL, `synchronous=FULL`, a 5-second busy timeout, prepared parameters, short-lived connections, explicit insert/cleanup transactions, and automatic checkpoints. The widget reads its count and three rows in one short read transaction. It does not write, migrate, or continuously execute. Save failures propagate to Shortcuts; there is no guaranteed OS-level retry. Do not remove `-wal` or `-shm` files from a live database or copy only the main file for backup. [SQLite WAL documentation](https://sqlite.org/wal.html).
+Persistence uses WAL, `synchronous=FULL`, a 5-second busy timeout, prepared parameters, short-lived connections, explicit insert/cleanup transactions, and automatic checkpoints. Widget timelines read app counts, appearance, navigation state, and a bounded notification page in one short read transaction. Widget navigation intents write only their selected app and page settings using the same shared writer lock as notification saves; they never change notifications. The widget does not continuously execute. Save failures propagate to Shortcuts; there is no guaranteed OS-level retry. Do not remove `-wal` or `-shm` files from a live database or copy only the main file for backup. [SQLite WAL documentation](https://sqlite.org/wal.html).
 
 On Apple platforms, C# and Swift also acquire the same POSIX `flock` before opening a writable connection and release it after closing that connection. This serializes writes and close-time checkpoints across processes, protecting older system engines against the documented WAL-reset race. The OS releases locks after a process crash; a leftover `.lock` file is harmless. Read-only widget connections need no writer lock and can read during saves. The lock wait is bounded to five seconds. [SQLite race details](https://sqlite.org/wal.html#walreset).
 
@@ -95,7 +95,7 @@ Diagnostics contain random attempt IDs, timestamps, stages, save status, and num
 | `shared/schema.sql` | Single shared schema contract |
 | `native/Shared` | Swift SQLite adapter and common entitlements |
 | `native/NotificationHistoryIntents` | Save Notification action and ExtensionKit entry point |
-| `native/NotificationHistoryWidget` | Small/medium WidgetKit views and timeline provider |
+| `native/NotificationHistoryWidget` | Large/extra-large WidgetKit views, paging intents and timeline provider |
 | `native/NotificationHistoryBridge` | Small C ABI function for MAUI to request widget reloads |
 | `native/project.yml` | Versioned XcodeGen project specification for the native targets |
 | `tests` | Managed persistence checks and native/managed cross-process tests |
@@ -136,7 +136,7 @@ python3 scripts/package-ipa.py \
 
 For simulator UI testing, build native products with `CONFIGURATION=Debug NATIVE_SDK=iphonesimulator bash scripts/build-native.sh`, then build MAUI in Debug with `iossimulator-arm64` on Apple Silicon (or `iossimulator-x64` on Intel), passing the absolute `Debug-iphonesimulator` NativeBuildDir. Simulator App Group behavior is not proof of device provisioning. Use `xcrun simctl install booted <app-path>` and `xcrun simctl launch booted com.faikal.notificationhistory` after building. For physical-device UI tests, re-sign/install the Debug app using your setup; Settings → Development tools allows custom source/title/subtitle/message/date, sample insertion, and deep-link testing. Release builds omit that page and its sample text.
 
-The cross-storage script seeds via C#, reads/writes via Swift, runs C# and Swift writers simultaneously, checks native widget snapshots, then verifies Unicode and integrity in C#. These checks have passed on macOS in GitHub Actions. `SkipNativeIntegration=true` exists only to allow macOS managed compilation checks; such a build must not be installed or packaged as complete.
+The cross-storage script seeds via C#, reads/writes via Swift, runs C# and Swift writers simultaneously, checks native widget snapshots, then verifies Unicode and integrity in C#. Earlier storage checks have passed on macOS in GitHub Actions. Newly added interactive widget storage cases, native compilation, and signed-device rendering remain pending. `SkipNativeIntegration=true` exists only to allow macOS managed compilation checks; such a build must not be installed or packaged as complete.
 
 ## Shortcuts setup
 
@@ -151,9 +151,13 @@ The app cannot install personal automations for you, bypass preview redaction, r
 
 ## Widget setup
 
-Add Notification History through the Home Screen widget gallery. Small shows today’s count and the latest source/title; medium shows three latest captured notifications. Reloads are requested after saves, favorites, deletion, and cleanup. A 15-minute timeline policy is a request subject to WidgetKit’s budget, not an exact interval. [WidgetKit update scheduling](https://developer.apple.com/documentation/widgetkit/keeping-a-widget-up-to-date).
+Add Notification History through the Home Screen widget gallery. Supported sizes are **Large**, **Extra-large** on iPad, and **Extra-large Portrait** on iOS 27. Small and Medium are no longer offered; remove an old widget and add a larger one after upgrading. The widget uses consistent 18-point outer padding, gutters for badge outlines, the app's Light/Dark/System setting, and rounded notification cards with your configured photos/colors, optional subtitle labels, and device-local times. The number of cards adapts to available height; wide iPad widgets use two columns. Last partial pages retain the same card heights.
 
-Small and medium row taps use `notificationhistory://notification/123`; background taps use `notificationhistory://history`. Cold launch links are queued until the navigation window is ready. Invalid/deleted IDs show an unavailable message. Widget preview content is marked privacy-sensitive, but prior system-rendered snapshots can still persist; use only widgets you are comfortable displaying.
+The badge row shows four apps per page, or three on narrow widgets. Its **Apps** arrows page through more badges without changing the active app. Tap a badge to show that app's notifications and reset its notification page. Separate **Notifications** arrows browse older/newer pages; page indicators and disabled boundary buttons distinguish the controls. The first alphabetical app is selected initially. Selection and pages persist independently for each widget size; multiple widgets of the same size share this state. Counts cover retained saved records, not unread notifications. Configured apps remain available with zero counts, and removal of a selected source falls back to the first app. Interactions refresh the widget without opening the main app; free gesture scrolling is not supported by WidgetKit. [Apple's interactive widget guidance](https://developer.apple.com/documentation/widgetkit/adding-interactivity-to-widgets-and-live-activities).
+
+Reloads are requested after saves, favorites, deletion, and cleanup. A 15-minute timeline policy is a request subject to WidgetKit's budget, not an exact interval. [WidgetKit update scheduling](https://developer.apple.com/documentation/widgetkit/keeping-a-widget-up-to-date).
+
+Notification card taps use `notificationhistory://notification/123`; background taps use `notificationhistory://history`. Cold launch links are queued until the navigation window is ready. Invalid/deleted IDs show an unavailable message. Widget preview content is marked privacy-sensitive, but prior system-rendered snapshots can still persist; use only widgets you are comfortable displaying.
 
 ## Identifiers and configuration
 
@@ -172,7 +176,9 @@ If changing source identifiers, update the preferred App Group in both managed a
 
 ## GitHub Actions and releases
 
-`.github/workflows/build-ios.yml` builds an IPA only when a **new `v*.*.*` tag is pushed**, on the first run attempt. Branch pushes, pull requests, tag updates/deletions, and reruns do not build an IPA; there is no manual dispatch trigger. It uses `macos-latest`, Release, and **ios-arm64**. Version `v1.0.2` yields display version `1.0.2`; a separate valid three-part numeric build number derives from the Actions run/attempt counters. The app, widget, App Intent extension, and bridge share both versions. It caches NuGet packages, installs only MAUI iOS, builds native targets once, checks persistence/interoperability, then builds the device app and validates the IPA. The timeout is 45 minutes and obsolete builds on the same reference cancel. Read-only repository permissions suffice; it does not publish GitHub Releases.
+`.github/workflows/build-ios.yml` builds an IPA only when a **new `v*.*.*` tag is pushed**, on the first run attempt. Branch pushes, pull requests, tag updates/deletions, and reruns do not build an IPA; there is no manual dispatch trigger. The MAUI job keeps `macos-latest`, matching **Xcode 26.4**, Release, and **ios-arm64**. A separate `xcode-27` job compiles the widget with the iOS 27 SDK to include Extra-large Portrait; its checked archive replaces only the widget bundle before app packaging. The app/intent/bridge toolchain and user-maintained packaging/download steps remain in place. The handoff checks identity, extension point, versions, SDK, executable presence, deployment target and archive paths before replacing anything; temporary staging is removed on success/failure. Native storage tests cover both badge and notification paging. Final IPA validation still verifies the actual device binaries and shared schemas.
+
+Version `v1.0.2` yields display version `1.0.2`; a separate valid three-part numeric build number derives from the Actions run/attempt counters. Both jobs derive the same versions for the app, widget, App Intent extension, and bridge. The widget job has a 25-minute timeout and the MAUI job has a 45-minute timeout; obsolete runs on the same reference cancel. Read-only repository permissions suffice; the workflow does not publish GitHub Releases. Local `scripts/build-native.sh` with Xcode 26.4 offers Large/iPad Extra-large only. To include iPhone Extra-large Portrait locally, run `scripts/build-widget.sh` with Xcode 27 and overlay its output using `scripts/install-widget.py`, passing the same version/build as the main native build.
 
 This repository currently uses **main**:
 

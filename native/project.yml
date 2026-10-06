@@ -30,6 +30,7 @@ targets:
       - path: NotificationHistoryWidget
         excludes: [Info.plist]
       - path: Shared/SharedDatabase.swift
+      - path: Shared/WidgetModels.swift
       - path: Shared/SharedWriterLock.swift
       - path: Shared/SignedAppGroups.swift
       - path: ../shared/schema.sql
@@ -55,6 +56,7 @@ targets:
       - path: NotificationHistoryIntents
         excludes: [Info.plist]
       - path: Shared/SharedDatabase.swift
+      - path: Shared/WidgetModels.swift
       - path: Shared/SharedWriterLock.swift
       - path: Shared/SignedAppGroups.swift
       - path: ../shared/schema.sql
@@ -75,6 +77,10 @@ targets:
     dependencies:
       - sdk: libsqlite3.tbd
 schemes:
+  NotificationHistoryWidget:
+    build:
+      targets:
+        NotificationHistoryWidget: all
   NotificationHistoryNative:
     build:
       targets:

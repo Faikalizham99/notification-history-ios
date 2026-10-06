@@ -38,6 +38,7 @@ struct NativeStorageTests {
         }
         let file = URL(fileURLWithPath: CommandLine.arguments[1])
         let schema = URL(fileURLWithPath: CommandLine.arguments[2])
+        try WidgetStorageTests.run(directory: file.deletingLastPathComponent(), schema: schema)
         let diagnosticDirectory = file.deletingLastPathComponent().appendingPathComponent("capture-diagnostics-" + UUID().uuidString, isDirectory: true)
         let trace = CaptureTrace(testingDirectory: diagnosticDirectory)
         trace.mark("opening_storage")
@@ -106,6 +107,8 @@ struct NativeStorageTests {
                 _ = try connection.save(source: "Native burst", title: "\(index)", subtitle: nil, body: "测试")
                 let reader = try SharedDatabase(readOnly: true, testingPath: file)
                 guard try reader.snapshot().recent.count == 3 else { throw HistoryError.database }
+                guard try reader.widgetSnapshot(layout: WidgetPageLayout(scope: "large", badgePageSize: 4,
+                    notificationPageSize: 2)).notifications.count <= 2 else { throw HistoryError.database }
             } catch { failures.record() }
         }
         guard failures.count() == 0 else { fatalError("Concurrent native/managed storage checks failed") }
