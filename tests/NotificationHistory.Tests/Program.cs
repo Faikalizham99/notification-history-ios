@@ -99,8 +99,13 @@ try
         found.AddRange(page); cursor = new(page[^1].ReceivedAt, page[^1].Id);
     } while (true);
     Check(found.Count == 160 && found.Select(x => x.Id).Distinct().Count() == 160, "Concurrent writes and stable keyset pagination");
+    var oldFavorite = await db.SaveAsync(new() { SourceApp = "Old favorite", Body = "Keep this message", ReceivedAt = now.AddDays(-8).ToUnixTimeMilliseconds() });
+    await db.SetFavoriteAsync(oldFavorite, true);
     await db.SaveAsync(new() { SourceApp = "Old", ReceivedAt = now.AddDays(-8).ToUnixTimeMilliseconds() });
     await db.SetSettingAsync("retention", "7"); Check(await db.CleanupAsync(now) == 1, "Retention cutoff");
+    Check((await db.GetAsync(oldFavorite)) is { IsFavorite: true, Body: "Keep this message" }, "Retention cleanup preserves expired favorites");
+    await db.SaveAsync(new() { SourceApp = "New capture", Body = "Triggers save-time cleanup" });
+    Check((await db.GetAsync(oldFavorite))?.IsFavorite == true, "Save-time cleanup also preserves expired favorites");
     var start = new DateTimeOffset(now.LocalDateTime.Date).ToUnixTimeMilliseconds();
     var end = new DateTimeOffset(now.LocalDateTime.Date.AddDays(1)).ToUnixTimeMilliseconds();
     Check((await db.QueryAsync(new(From: start, To: end), limit: 200)).Count >= 160, "Local day range");
@@ -108,8 +113,12 @@ try
      !DeepLinks.TryParse("notificationhistory://notification/-1", out _) && !DeepLinks.TryParse("https://notification/123", out _), "Deep link validation");
     Check(await db.IntegrityAsync() == "ok", "Database integrity after concurrent access");
     await db.DeleteAsync(id); Check(await db.GetAsync(id) is null, "Delete");
-    await db.ClearAsync(); Check((await db.QueryAsync(new())).Count == 0, "Clear history");
+    await db.ClearAsync(); Check((await db.QueryAsync(new())).Single().Id == oldFavorite &&
+        (await db.GetAsync(oldFavorite))?.Body == "Keep this message", "Bulk clear removes non-favorites and preserves the full favorite message");
     Check(await db.SettingAsync("retention") == "7", "Settings survive clear");
+    await db.SetFavoriteAsync(oldFavorite, false);
+    Check(await db.CleanupAsync(now) == 1 && await db.GetAsync(oldFavorite) is null,
+        "An expired notification becomes eligible for cleanup after it is unfavorited");
     await db.SetSettingAsync("retention", "0");
     using (var fixture = new SQLite.SQLiteConnection(path))
     {

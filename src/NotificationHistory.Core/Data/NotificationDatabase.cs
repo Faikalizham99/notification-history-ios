@@ -120,7 +120,7 @@ public sealed class NotificationDatabase
     public Task SetFavoriteAsync(long id, bool value) => Run(db => db.Execute("UPDATE Notifications SET IsFavorite=? WHERE Id=?", value, id));
     public Task MarkReadAsync(long id) => Run(db => db.Execute("UPDATE Notifications SET IsRead=1 WHERE Id=?", id));
     public Task DeleteAsync(long id) => Run(db => db.Execute("DELETE FROM Notifications WHERE Id=?", id));
-    public Task ClearAsync() => Run(db => { db.Execute("DELETE FROM Notifications"); db.ExecuteScalar<int>("PRAGMA wal_checkpoint(TRUNCATE)"); return 0; });
+    public Task ClearAsync() => Run(db => { db.Execute("DELETE FROM Notifications WHERE IsFavorite=0"); db.ExecuteScalar<int>("PRAGMA wal_checkpoint(TRUNCATE)"); return 0; });
     public Task<string?> SettingAsync(string key) => Run(db => db.ExecuteScalar<string?>("SELECT Value FROM Settings WHERE Key=?", key));
     public Task SetSettingAsync(string key, string value) => Run(db => db.Execute("INSERT OR REPLACE INTO Settings(Key,Value) VALUES(?,?)", key, value));
     public Task<List<AppProfile>> ProfilesAsync() => Run(db => db.Table<AppProfile>().OrderBy(x => x.DisplayName).ToList());
@@ -146,7 +146,7 @@ public sealed class NotificationDatabase
     private static int Cleanup(SQLiteConnection db, long now)
     {
         var days = db.ExecuteScalar<string?>("SELECT Value FROM Settings WHERE Key='retention'");
-        return int.TryParse(days, out var value) && value > 0 ? db.Execute("DELETE FROM Notifications WHERE ReceivedAt<?", now - value * 86400000L) : 0;
+        return int.TryParse(days, out var value) && value > 0 ? db.Execute("DELETE FROM Notifications WHERE IsFavorite=0 AND ReceivedAt<?", now - value * 86400000L) : 0;
     }
     public Task<string> IntegrityAsync() => Run(db => db.ExecuteScalar<string>("PRAGMA integrity_check"));
     private sealed class SourceRow { public string SourceApp { get; set; } = ""; }

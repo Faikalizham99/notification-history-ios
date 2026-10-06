@@ -175,7 +175,7 @@ final class SharedDatabase {
             }
             let days = Int(try textScalar("SELECT COALESCE((SELECT Value FROM Settings WHERE Key='retention'),'0')") ?? "0") ?? 0
             if days > 0 {
-                let cleanup = try prepare("DELETE FROM Notifications WHERE ReceivedAt<?"); defer { sqlite3_finalize(cleanup) }
+                let cleanup = try prepare("DELETE FROM Notifications WHERE IsFavorite=0 AND ReceivedAt<?"); defer { sqlite3_finalize(cleanup) }
                 sqlite3_bind_int64(cleanup, 1, now - Int64(days) * 86_400_000)
                 guard sqlite3_step(cleanup) == SQLITE_DONE else { throw HistoryError.database }
             }
@@ -190,8 +190,8 @@ final class SharedDatabase {
             let end = Int64(Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: now))!.timeIntervalSince1970 * 1000)
             let days = Int(try textScalar("SELECT COALESCE((SELECT Value FROM Settings WHERE Key='retention'),'0')") ?? "0") ?? 0
             let cutoff = days > 0 ? Int64(now.timeIntervalSince1970 * 1000) - Int64(days) * 86_400_000 : Int64.min
-            let count = Int(try scalar("SELECT COUNT(*) FROM Notifications WHERE ReceivedAt>=\(max(start, cutoff)) AND ReceivedAt<\(end)"))
-            let statement = try prepare("SELECT Id,substr(SourceApp,1,100),substr(Title,1,200),substr(Subtitle,1,200),substr(Body,1,200),ReceivedAt,CASE WHEN length(SourceApp)<=160 THEN SourceApp ELSE NULL END FROM Notifications WHERE ReceivedAt>=\(cutoff) ORDER BY ReceivedAt DESC,Id DESC LIMIT 3")
+            let count = Int(try scalar("SELECT COUNT(*) FROM Notifications WHERE ReceivedAt>=\(start) AND ReceivedAt<\(end) AND (IsFavorite=1 OR ReceivedAt>=\(cutoff))"))
+            let statement = try prepare("SELECT Id,substr(SourceApp,1,100),substr(Title,1,200),substr(Subtitle,1,200),substr(Body,1,200),ReceivedAt,CASE WHEN length(SourceApp)<=160 THEN SourceApp ELSE NULL END FROM Notifications WHERE (IsFavorite=1 OR ReceivedAt>=\(cutoff)) ORDER BY ReceivedAt DESC,Id DESC LIMIT 3")
             defer { sqlite3_finalize(statement) }
             var rows: [CapturedNotification] = []
             var status = sqlite3_step(statement)
@@ -252,7 +252,7 @@ final class SharedDatabase {
             }
             guard status == SQLITE_DONE else { throw databaseError() }
         }
-        let counts = try prepare("SELECT nh_source_key(SourceApp),MIN(SourceApp),COUNT(*) FROM Notifications WHERE ReceivedAt>=? GROUP BY nh_source_key(SourceApp)")
+        let counts = try prepare("SELECT nh_source_key(SourceApp),MIN(SourceApp),COUNT(*) FROM Notifications WHERE (IsFavorite=1 OR ReceivedAt>=?) GROUP BY nh_source_key(SourceApp)")
         defer { sqlite3_finalize(counts) }; sqlite3_bind_int64(counts, 1, cutoff)
         var status = sqlite3_step(counts)
         while status == SQLITE_ROW {
@@ -286,7 +286,7 @@ final class SharedDatabase {
             let selected = apps.first(where: { $0.key == navigation.selectedSourceKey })
             var rows: [CapturedNotification] = []
             if let selected, selected.count > 0 {
-                let statement = try prepare("SELECT Id,substr(SourceApp,1,100),substr(Title,1,200),substr(Subtitle,1,200),substr(Body,1,1024),ReceivedAt FROM Notifications WHERE ReceivedAt>=? AND nh_source_key(SourceApp)=? ORDER BY ReceivedAt DESC,Id DESC LIMIT ? OFFSET ?")
+                let statement = try prepare("SELECT Id,substr(SourceApp,1,100),substr(Title,1,200),substr(Subtitle,1,200),substr(Body,1,1024),ReceivedAt FROM Notifications WHERE (IsFavorite=1 OR ReceivedAt>=?) AND nh_source_key(SourceApp)=? ORDER BY ReceivedAt DESC,Id DESC LIMIT ? OFFSET ?")
                 defer { sqlite3_finalize(statement) }
                 sqlite3_bind_int64(statement, 1, cutoff); try bind(selected.key, to: statement, at: 2)
                 sqlite3_bind_int64(statement, 3, Int64(layout.notificationPageSize))

@@ -87,10 +87,36 @@ enum WidgetStorageTests {
         guard page.appCount == 1, page.selectedApp?.key == "Z EMPTY", page.selectedApp?.count == 0, page.notifications.isEmpty else {
             fatalError("Configured zero-count apps disappeared after history was cleared")
         }
+        try sql(file, "UPDATE Settings SET Value='0' WHERE Key='retention'")
+        let favorite: Int64
+        do {
+            let writer = try SharedDatabase(testingPath: file, schemaURL: schema)
+            favorite = try writer.save(source: "Kept favorite", title: "Keep me", subtitle: nil, body: "Saved favorite body",
+                receivedAt: now.addingTimeInterval(-8 * 86_400))
+            _ = try writer.save(source: "Expired ordinary", title: "Remove me", subtitle: nil, body: nil,
+                receivedAt: now.addingTimeInterval(-8 * 86_400))
+        }
+        try sql(file, "UPDATE Notifications SET IsFavorite=1 WHERE Id=\(favorite)")
+        try sql(file, "UPDATE Settings SET Value='7' WHERE Key='retention'")
+        try act(.selectApp, "KEPT FAVORITE"); page = try read()
+        guard page.appCount == 2, page.selectedApp?.count == 1, page.notifications.first?.id == favorite else {
+            fatalError("Expired favorites are hidden from widget app counts or cards")
+        }
+        _ = try SharedDatabase(testingPath: file, schemaURL: schema).save(source: "Fresh", title: "New capture", subtitle: nil, body: nil)
+        let recent = try SharedDatabase(readOnly: true, testingPath: file).snapshot(now: now).recent
+        guard recent.count == 2, recent.contains(where: { $0.id == favorite && $0.body == "Saved favorite body" }),
+              !recent.contains(where: { $0.source == "Expired ordinary" }) else {
+            fatalError("Native save-time retention removed a favorite or kept an expired ordinary notification")
+        }
+        try sql(file, "UPDATE Notifications SET IsFavorite=0 WHERE Id=\(favorite)")
+        page = try read()
+        guard page.selectedApp?.key == "FRESH", !page.notifications.contains(where: { $0.id == favorite }) else {
+            fatalError("Unfavorited expired records remain visible in the widget")
+        }
         var state = WidgetNavigation(selectedSourceKey: "missing", badgePage: Int.max, notificationPage: Int.max)
         state.resolve(apps: [], layout: layout)
         guard state.selectedSourceKey == nil, state.badgePage == 0, state.notificationPage == 0 else { fatalError("Empty catalog navigation is invalid") }
-        print("PASS widget badge/notification paging, selection, retention, Unicode, family isolation, deletion and corrupt-state recovery")
+        print("PASS widget badge/notification paging, selection, favorite retention, Unicode, family isolation, deletion and corrupt-state recovery")
     }
     private static func sql(_ file: URL, _ query: String) throws {
         var handle: OpaquePointer?
