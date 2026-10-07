@@ -18,6 +18,8 @@ public sealed class AppProfile
     public string? ImageFile { get; set; }
     public string? OriginalImageFile { get; set; }
     public string IconShape { get; set; } = "Rounded";
+    // Stored in Settings alongside the profile, keeping shared schema version 2 compatible.
+    [Ignore] public string? OpenAppUrl { get; set; }
 
     public AppProfile Copy() => (AppProfile)MemberwiseClone();
     public static string Key(string? source) => (source ?? "").Trim().ToUpperInvariant();
@@ -41,6 +43,7 @@ public sealed class AppProfile
         if (SourceName.Length is 0 or > 160 || DisplayName.Length is 0 or > 80)
             throw new ArgumentException("Enter a source name (up to 160 characters) and a display name (up to 80 characters).");
         SourceKey = Key(SourceName);
+        OpenAppUrl = AppOpeningLinks.Normalize(OpenAppUrl);
         BackgroundColor = AppearanceColors.Normalize(BackgroundColor);
         GradientColor = AppearanceColors.Normalize(GradientColor);
         TitleColor = AppearanceColors.Normalize(TitleColor);

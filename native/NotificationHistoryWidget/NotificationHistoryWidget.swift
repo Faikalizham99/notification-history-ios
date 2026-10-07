@@ -189,7 +189,7 @@ private struct HistoryWidgetView: View {
                                 Link(destination: item.url) {
                                     NotificationCard(item: item)
                                 }.buttonStyle(.plain).frame(maxWidth: .infinity, maxHeight: .infinity)
-                                    .accessibilityLabel("\(item.titleDisplay). \(item.preview). Open notification")
+                                    .accessibilityLabel("\(item.titleDisplay). \(item.preview). Open source app or saved details")
                                     .privacySensitive()
                             } else { Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity) }
                         }

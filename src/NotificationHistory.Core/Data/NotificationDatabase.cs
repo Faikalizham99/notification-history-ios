@@ -1,4 +1,5 @@
 using NotificationHistory.Core.Models;
+using NotificationHistory.Core.Services;
 using SQLite;
 namespace NotificationHistory.Core.Data;
 
@@ -123,7 +124,15 @@ public sealed class NotificationDatabase
     public Task ClearAsync() => Run(db => { db.Execute("DELETE FROM Notifications WHERE IsFavorite=0"); db.ExecuteScalar<int>("PRAGMA wal_checkpoint(TRUNCATE)"); return 0; });
     public Task<string?> SettingAsync(string key) => Run(db => db.ExecuteScalar<string?>("SELECT Value FROM Settings WHERE Key=?", key));
     public Task SetSettingAsync(string key, string value) => Run(db => db.Execute("INSERT OR REPLACE INTO Settings(Key,Value) VALUES(?,?)", key, value));
-    public Task<List<AppProfile>> ProfilesAsync() => Run(db => db.Table<AppProfile>().OrderBy(x => x.DisplayName).ToList());
+    public Task<string?> AppOpeningUrlAsync(string? source) => Run(db =>
+        db.ExecuteScalar<string?>("SELECT Value FROM Settings WHERE Key=?", AppOpeningLinks.SettingsKey(source)));
+    public Task<List<AppProfile>> ProfilesAsync() => Run(db =>
+    {
+        var profiles = db.Table<AppProfile>().OrderBy(x => x.DisplayName).ToList();
+        foreach (var profile in profiles)
+            profile.OpenAppUrl = db.ExecuteScalar<string?>("SELECT Value FROM Settings WHERE Key=?", AppOpeningLinks.SettingsKey(profile.SourceKey));
+        return profiles;
+    });
     public Task SaveProfileAsync(AppProfile profile, string? previousKey = null) => Run(db =>
     {
         profile.Validate();
@@ -136,12 +145,30 @@ public sealed class NotificationDatabase
                 profile.SourceKey, profile.SourceName, profile.DisplayName, profile.BackgroundColor, profile.GradientColor,
                 profile.UseGradient, profile.TitleColor, profile.BodyColor, profile.TimestampColor, profile.AutoTextColor,
                 profile.ImageFile, profile.OriginalImageFile, profile.IconShape);
-            if (previousKey is not null && previousKey != profile.SourceKey) db.Delete<AppProfile>(previousKey);
+            if (profile.OpenAppUrl is null)
+                db.Execute("DELETE FROM Settings WHERE Key=?", AppOpeningLinks.SettingsKey(profile.SourceKey));
+            else
+                db.Execute("INSERT OR REPLACE INTO Settings(Key,Value) VALUES(?,?)", AppOpeningLinks.SettingsKey(profile.SourceKey), profile.OpenAppUrl);
+            if (previousKey is not null && previousKey != profile.SourceKey)
+            {
+                db.Delete<AppProfile>(previousKey);
+                db.Execute("DELETE FROM Settings WHERE Key=?", AppOpeningLinks.SettingsKey(previousKey));
+            }
             db.Execute("COMMIT"); return 0;
         }
         catch { db.Execute("ROLLBACK"); throw; }
     });
-    public Task DeleteProfileAsync(string key) => Run(db => db.Delete<AppProfile>(key));
+    public Task DeleteProfileAsync(string key) => Run(db =>
+    {
+        db.Execute("BEGIN IMMEDIATE");
+        try
+        {
+            var removed = db.Delete<AppProfile>(key);
+            db.Execute("DELETE FROM Settings WHERE Key=?", AppOpeningLinks.SettingsKey(key));
+            db.Execute("COMMIT"); return removed;
+        }
+        catch { db.Execute("ROLLBACK"); throw; }
+    });
     public Task<int> CleanupAsync(DateTimeOffset? now = null) => Run(db => Cleanup(db, (now ?? DateTimeOffset.UtcNow).ToUnixTimeMilliseconds()));
     private static int Cleanup(SQLiteConnection db, long now)
     {

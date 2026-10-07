@@ -18,6 +18,9 @@ public sealed class AppAppearancePage : ContentPage
         changeIcon = AppearanceUI.Button("Change Icon  ›"), cropAgain = AppearanceUI.Button("Crop again"), removeIcon = AppearanceUI.Button("Remove icon");
     private readonly Entry name = new() { FontSize = 23, FontAttributes = FontAttributes.Bold, MaxLength = 80, Placeholder = "Display name" };
     private readonly Entry source = new() { MaxLength = 160, Placeholder = "WhatsApp" };
+    private readonly Entry openAppUrl = new() { MaxLength = 2048, Placeholder = "appscheme://", Keyboard = Keyboard.Url,
+        IsTextPredictionEnabled = false, IsSpellCheckEnabled = false, ReturnType = ReturnType.Done };
+    private readonly Button testOpening = AppearanceUI.Button("Test opening");
     private readonly Switch gradient = new() { OnColor = Color.FromArgb("#14B8A6") }, automatic = new() { OnColor = Color.FromArgb("#14B8A6") };
     private readonly Picker shape = new() { ItemsSource = new[] { "Rounded", "Circle" }, Title = "Icon shape" };
     private readonly VerticalStackLayout manualColors = new() { Spacing = 14 };
@@ -50,6 +53,16 @@ public sealed class AppAppearancePage : ContentPage
         var sourcePanel = new VerticalStackLayout { Spacing = 6 };
         sourcePanel.Add(AppearanceUI.Caption("SOURCE APP")); source.Text = draft.SourceName; source.TextChanged += (_, _) => { draft.SourceName = source.Text ?? ""; };
         sourcePanel.Add(AppearanceUI.EditField(source)); sourcePanel.Add(AppearanceUI.Caption("Match the Source App value in your Save Notification Shortcut.")); stack.Add(AppearanceUI.Panel(sourcePanel));
+        var openingPanel = new VerticalStackLayout { Spacing = 10 };
+        openingPanel.Add(AppearanceUI.Text("Open source app", 20, true));
+        openingPanel.Add(AppearanceUI.Caption("Widget notification taps open this app. Leave the link blank to open saved notification details."));
+        openingPanel.Add(AppearanceUI.Caption("OPEN APP URL")); openAppUrl.Text = draft.OpenAppUrl;
+        openAppUrl.TextChanged += (_, _) => { draft.OpenAppUrl = openAppUrl.Text; testOpening.IsEnabled = !busy && !string.IsNullOrWhiteSpace(openAppUrl.Text); };
+        openAppUrl.Completed += (_, _) => openAppUrl.Unfocus();
+        openingPanel.Add(AppearanceUI.EditField(openAppUrl));
+        openingPanel.Add(AppearanceUI.Caption("Use a full app-opening URL or an HTTPS app link, not a bundle ID. Test it, then Save to apply."));
+        testOpening.IsEnabled = !string.IsNullOrWhiteSpace(openAppUrl.Text); testOpening.Clicked += OnTestOpening;
+        openingPanel.Add(testOpening); stack.Add(AppearanceUI.Panel(openingPanel));
         var previewPanel = new VerticalStackLayout { Spacing = 10 };
         previewPanel.Add(AppearanceUI.Caption("NOTIFICATION PREVIEW")); previewPanel.Add(preview);
         previewPanel.Add(AppearanceUI.Caption("Your appearance applies to existing and new notifications from this source.")); stack.Add(previewPanel);
@@ -88,14 +101,14 @@ public sealed class AppAppearancePage : ContentPage
             var removeAppearance = AppearanceUI.Button("Remove custom appearance"); removeAppearance.SetAppThemeColor(Button.TextColorProperty, Color.FromArgb("#B42323"), Color.FromArgb("#FF8A8A"));
             removeAppearance.Clicked += async (_, _) =>
             {
-                if (busy || !await DisplayAlertAsync("Remove custom appearance?", "Restore the default appearance for this source. Your notification history will be kept.", "Remove", "Cancel")) return;
+                if (busy || !await DisplayAlertAsync("Remove custom appearance?", "Restore the default appearance and remove the app-opening link for this source. Your notification history will be kept.", "Remove", "Cancel")) return;
                 SetBusy(true);
                 try { await services.Appearance.ResetAsync(previousKey); services.NotifyChanged(); await Navigation.PopAsync(); }
                 catch { await DisplayAlertAsync("Unable to remove appearance", "Please try again.", "OK"); }
                 finally { SetBusy(false); }
             }; stack.Add(removeAppearance);
         }
-        stack.Add(AppearanceUI.Caption("Photos and appearance settings stay on your iPhone."));
+        stack.Add(AppearanceUI.Caption("Photos, appearance settings and app-opening links stay on your iPhone."));
         var layout = new Grid { RowDefinitions = { new(GridLength.Auto), new(GridLength.Star) } };
         var header = AppearanceUI.Header(cancel, "App Appearance", save); header.Margin = new Thickness(20, 12, 20, 0);
         layout.Add(header); layout.Add(new ScrollView { Content = stack }, 0, 1); Content = layout; UpdateFields();
@@ -127,7 +140,25 @@ public sealed class AppAppearancePage : ContentPage
         cropAgain.IsEnabled = removeIcon.IsEnabled = !busy && icon is not null;
     }
     private void SetBusy(bool value, string message = "Saving…")
-    { busy = value; progress.Text = message; progress.IsVisible = value; save.IsEnabled = cancel.IsEnabled = changeIcon.IsEnabled = !value; Render(); }
+    {
+        busy = value; progress.Text = message; progress.IsVisible = value; save.IsEnabled = cancel.IsEnabled = changeIcon.IsEnabled = !value;
+        openAppUrl.IsEnabled = !value; testOpening.IsEnabled = !value && !string.IsNullOrWhiteSpace(openAppUrl.Text); Render();
+    }
+    private async void OnTestOpening(object? sender, EventArgs e)
+    {
+        if (busy) return;
+        openAppUrl.Unfocus(); SetBusy(true, "Opening app…");
+        try
+        {
+            if (!await SourceAppLauncher.OpenAsync(openAppUrl.Text))
+                await DisplayAlertAsync("App did not open", "Check that the app is installed and the opening link is supported. Your changes have not been saved.", "OK");
+        }
+        catch (Exception error)
+        {
+            await DisplayAlertAsync("App did not open", error is ArgumentException ? error.Message : "Could not open this app. Check the link and try again.", "OK");
+        }
+        finally { SetBusy(false); }
+    }
     private async void OnPickIcon(object? sender, EventArgs e)
     {
         if (busy) return; SetBusy(true, "Preparing photo…");
@@ -163,6 +194,7 @@ public sealed class AppAppearancePage : ContentPage
             backgroundField.Apply(); if (draft.UseGradient) gradientField.Apply();
             if (!draft.AutoTextColor) { titleField.Apply(); bodyField.Apply(); timeField.Apply(); }
             draft.SourceName = source.Text ?? ""; draft.DisplayName = name.Text ?? "";
+            draft.OpenAppUrl = openAppUrl.Text;
             await services.Appearance.SaveAsync(draft, previousKey, originalBytes, croppedBytes);
             services.NotifyChanged(); await Navigation.PopAsync();
         }

@@ -22,7 +22,7 @@ struct CapturedNotification: Sendable {
     let body: String?
     let receivedAt: Int64
     var appearance: NotificationAppearance? = nil
-    var url: URL { URL(string: "notificationhistory://notification/\(id)")! }
+    var url: URL { URL(string: "notificationhistory://source-app/\(id)")! }
     var sourceDisplay: String {
         if let appearance { return appearance.displayName }
         guard let source, !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return "Unknown app" }

@@ -34,6 +34,9 @@ enum WidgetStorageTests {
             fatalError("Widget first-app selection, normalized counts, retention, or bounded previews differ")
         }
         let firstIDs = Set(page.notifications.map(\.id))
+        guard page.notifications.allSatisfy({ $0.url.absoluteString == "notificationhistory://source-app/\($0.id)" }) else {
+            fatalError("Widget card taps do not resolve a saved notification ID for source-app launching")
+        }
         try act(.nextNotifications); page = try read()
         guard page.navigation.notificationPage == 1, page.notifications.count == 2,
               firstIDs.isDisjoint(with: page.notifications.map(\.id)) else { fatalError("Widget notification pages overlap") }

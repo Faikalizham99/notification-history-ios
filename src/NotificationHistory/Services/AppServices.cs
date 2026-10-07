@@ -41,8 +41,26 @@ public sealed class AppServices(NotificationDatabase database)
         var link = pendingLink; pendingLink = null;
         if (Uri.TryCreate(link, UriKind.Absolute, out var home) && home.Scheme == "notificationhistory" && home.Host == "history")
         { await Application.Current!.Windows[0].Page!.Navigation.PopToRootAsync(); return; }
+        if (DeepLinks.TryParseSourceApp(link, out var sourceId)) { await OpenSourceAppAsync(sourceId); return; }
         if (!DeepLinks.TryParse(link, out var id)) { await AlertAsync("Invalid link", "This notification link is invalid."); return; }
         await OpenDetailAsync(id);
+    }
+    private async Task OpenSourceAppAsync(long id)
+    {
+        try
+        {
+            var entry = await Database.GetAsync(id);
+            if (entry is null) { await AlertAsync("Notification unavailable", "It may have been deleted or removed by retention."); return; }
+            var opened = false;
+            try
+            {
+                var url = await Database.AppOpeningUrlAsync(entry.SourceApp);
+                opened = await SourceAppLauncher.OpenAsync(url);
+            }
+            catch { /* An unavailable or invalid opening link falls back to local details. */ }
+            if (!opened) await OpenDetailAsync(id);
+        }
+        catch { await AlertAsync("Unable to open", "Shared history is currently unavailable. Please try again."); }
     }
     public async Task OpenDetailAsync(long id)
     {
