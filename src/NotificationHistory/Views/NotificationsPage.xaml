@@ -3,7 +3,7 @@
  xmlns:vm="clr-namespace:NotificationHistory.ViewModels" xmlns:views="clr-namespace:NotificationHistory.Views"
  x:Class="NotificationHistory.Views.NotificationsPage" x:DataType="vm:NotificationsViewModel" Title="Notification History">
  <ContentPage.ToolbarItems><ToolbarItem Text="Apps" Clicked="OnApps" /><ToolbarItem Text="Settings" Clicked="OnSettings" /></ContentPage.ToolbarItems>
- <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Padding="16,8" RowSpacing="8">
+ <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*" Padding="16,8" RowSpacing="8">
   <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
   <Border Style="{StaticResource InputBorderStyle}" Padding="14,4">
    <Grid ColumnDefinitions="20,*" ColumnSpacing="10">
@@ -28,25 +28,29 @@
    <Button x:Name="SourceButton" Grid.Column="1" Text="{Binding SelectedAppName}" FontSize="13" LineBreakMode="TailTruncation" Clicked="OnSource" />
    <Button x:Name="DateButton" Grid.Column="2" Text="Any date" FontSize="13" Clicked="OnDate" />
   </Grid>
-  <ScrollView Grid.Row="2" x:Name="AppBadgeScroll" Orientation="Horizontal" IsVisible="{Binding HasAppBadges}" HorizontalScrollBarVisibility="Default">
+  <ScrollView Grid.Row="2" x:Name="AppBadgeScroll" Orientation="Horizontal" IsVisible="{Binding HasAppBadges}" HorizontalScrollBarVisibility="Default" Scrolled="OnBadgeScrolled">
    <HorizontalStackLayout x:Name="AppBadgeRow" Padding="4,2,4,8" Spacing="8" BindableLayout.ItemsSource="{Binding AppBadges}">
     <BindableLayout.ItemTemplate><DataTemplate x:DataType="vm:AppBadgeModel">
-     <views:AppBadgeView>
-      <views:AppBadgeView.GestureRecognizers><TapGestureRecognizer Tapped="OnBadgeTapped" /></views:AppBadgeView.GestureRecognizers>
-     </views:AppBadgeView>
+     <views:AppBadgeView Tapped="OnBadgeTapped" LongPressed="OnBadgeLongPressed" />
     </DataTemplate></BindableLayout.ItemTemplate>
    </HorizontalStackLayout>
   </ScrollView>
-  <Border x:Name="FilterDateField" Grid.Row="3" Style="{StaticResource InputBorderStyle}" Padding="14,4" IsVisible="False">
+  <Grid Grid.Row="3" x:Name="BadgeClearControls" ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="False" Padding="4,0">
+   <Label Text="Tap X to clear non-favorites." FontSize="13" VerticalOptions="Center"
+     TextColor="{AppThemeBinding Light=#62626B, Dark=#A4A4AD}" />
+   <Button Grid.Column="1" Text="Cancel" FontSize="14" MinimumHeightRequest="44" Padding="12,8"
+     Clicked="OnCancelBadgeClear" SemanticProperties.Hint="Restores the app badge without clearing history." />
+  </Grid>
+  <Border x:Name="FilterDateField" Grid.Row="4" Style="{StaticResource InputBorderStyle}" Padding="14,4" IsVisible="False">
    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
     <DatePicker x:Name="FilterDate" DateSelected="OnDateSelected" BackgroundColor="Transparent" MinimumHeightRequest="48" TextColor="{AppThemeBinding Light=#1C1C1E, Dark=White}" />
     <Label Grid.Column="1" Text="⌄" FontSize="23" VerticalOptions="Center" InputTransparent="True" />
    </Grid>
    <Border.GestureRecognizers><TapGestureRecognizer Tapped="OnDateFieldTapped" /></Border.GestureRecognizers>
   </Border>
-  <RefreshView Grid.Row="4" x:Name="Refresh" Refreshing="OnRefresh">
+  <RefreshView Grid.Row="5" x:Name="Refresh" Refreshing="OnRefresh">
    <CollectionView ItemsSource="{Binding Groups}" IsGrouped="True" SelectionMode="None"
-     RemainingItemsThreshold="12" RemainingItemsThresholdReached="OnLoadMore">
+     RemainingItemsThreshold="12" RemainingItemsThresholdReached="OnLoadMore" Scrolled="OnHistoryScrolled">
     <CollectionView.EmptyView><VerticalStackLayout Padding="24,60" Spacing="12"><Label Text="A little peace of mind" FontSize="24" HorizontalTextAlignment="Center" /><Label Text="{Binding EmptyMessage}" HorizontalTextAlignment="Center" /></VerticalStackLayout></CollectionView.EmptyView>
     <CollectionView.GroupHeaderTemplate><DataTemplate x:DataType="vm:NotificationGroup"><Label Text="{Binding Title}" FontSize="13" FontAttributes="Bold" TextColor="{AppThemeBinding Light=#636366, Dark=#AEAEB2}" Padding="12,18,16,8" /></DataTemplate></CollectionView.GroupHeaderTemplate>
     <CollectionView.ItemTemplate><DataTemplate x:DataType="vm:NotificationCardModel">
@@ -71,6 +75,6 @@
     </DataTemplate></CollectionView.ItemTemplate>
    </CollectionView>
   </RefreshView>
-  <ActivityIndicator Grid.Row="4" IsRunning="{Binding Busy}" IsVisible="{Binding Busy}" Color="#087E8B" HorizontalOptions="Center" VerticalOptions="Start" InputTransparent="True" />
+  <ActivityIndicator Grid.Row="5" IsRunning="{Binding Busy}" IsVisible="{Binding Busy}" Color="#087E8B" HorizontalOptions="Center" VerticalOptions="Start" InputTransparent="True" />
  </Grid>
 </ContentPage>

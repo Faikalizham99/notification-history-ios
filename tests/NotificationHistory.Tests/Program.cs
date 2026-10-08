@@ -39,6 +39,7 @@ try
     await AppearanceTests.RunAsync(directory);
     await AppOpeningTests.RunAsync(directory);
     await AppBadgeTests.RunAsync(directory);
+    await AppCleanupTests.RunAsync(directory);
     await CaptureDiagnosticsTests.RunAsync(directory);
     var malaysia = new DateTimeOffset(2026, 10, 5, 13, 26, 7, TimeSpan.Zero).ToOffset(TimeSpan.FromHours(8));
     var malaysiaCulture = (System.Globalization.CultureInfo)System.Globalization.CultureInfo.GetCultureInfo("en-MY").Clone();

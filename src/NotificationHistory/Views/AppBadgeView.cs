@@ -2,11 +2,48 @@ using System.ComponentModel;
 using Microsoft.Maui.Controls.Shapes;
 using NotificationHistory.Core.Services;
 using NotificationHistory.ViewModels;
+#if IOS
+using UIKit;
+#endif
 namespace NotificationHistory.Views;
 
 public sealed class AppBadgeView : ContentView
 {
     private AppBadgeModel? model;
+    public event EventHandler? Tapped;
+    public event EventHandler? LongPressed;
+#if IOS
+    private UIView? gestureView;
+    private UITapGestureRecognizer? tap;
+    private UILongPressGestureRecognizer? hold;
+    protected override void OnHandlerChanged()
+    {
+        base.OnHandlerChanged();
+        if (Handler?.PlatformView is not UIView nativeView) return;
+        gestureView = nativeView;
+        hold = new UILongPressGestureRecognizer(gesture =>
+        {
+            if (gesture.State == UIGestureRecognizerState.Began) LongPressed?.Invoke(this, EventArgs.Empty);
+        }) { MinimumPressDuration = 0.6, AllowableMovement = 10 };
+        tap = new UITapGestureRecognizer(() => Tapped?.Invoke(this, EventArgs.Empty));
+        // Releasing the hold must not count as the second tap that asks to delete.
+        tap.RequireGestureRecognizerToFail(hold);
+        nativeView.AddGestureRecognizer(hold); nativeView.AddGestureRecognizer(tap);
+    }
+    protected override void OnHandlerChanging(HandlerChangingEventArgs args)
+    {
+        if (tap is not null) { gestureView?.RemoveGestureRecognizer(tap); tap.Dispose(); tap = null; }
+        if (hold is not null) { gestureView?.RemoveGestureRecognizer(hold); hold.Dispose(); hold = null; }
+        gestureView = null;
+        base.OnHandlerChanging(args);
+    }
+#else
+    public AppBadgeView()
+    {
+        var tap = new TapGestureRecognizer(); tap.Tapped += (_, _) => Tapped?.Invoke(this, EventArgs.Empty);
+        GestureRecognizers.Add(tap);
+    }
+#endif
     protected override void OnBindingContextChanged()
     {
         if (model is not null) model.PropertyChanged -= OnModelChanged;
@@ -32,19 +69,28 @@ public sealed class AppBadgeView : ContentView
                 HorizontalTextAlignment = TextAlignment.Center, VerticalTextAlignment = TextAlignment.Center };
         var contents = new HorizontalStackLayout { Spacing = 8, VerticalOptions = LayoutOptions.Center };
         contents.Add(icon);
-        contents.Add(new Label { Text = model.Data.Count.ToString("N0"), FontSize = 17, FontAttributes = FontAttributes.Bold,
-            TextColor = foreground, VerticalOptions = LayoutOptions.Center });
-        contents.Add(new Label { Text = model.IsSelected ? "✓" : "", WidthRequest = 16, FontSize = 16,
+        // Retain the count's layout space while armed so the badge row does not
+        // shift or clamp its scroll position when the count changes to X.
+        var count = new Grid { MinimumWidthRequest = 20, VerticalOptions = LayoutOptions.Center, InputTransparent = true };
+        count.Add(new Label { Text = model.Data.Count.ToString("N0"), FontSize = 17, FontAttributes = FontAttributes.Bold,
+            Opacity = model.IsClearArmed ? 0 : 1, TextColor = foreground, VerticalOptions = LayoutOptions.Center });
+        count.Add(new Label { Text = "×", FontSize = 22, FontAttributes = FontAttributes.Bold, IsVisible = model.IsClearArmed,
+            TextColor = Colors.White, HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center });
+        contents.Add(count);
+        contents.Add(new Label { Text = !model.IsClearArmed && model.IsSelected ? "✓" : "", WidthRequest = 16, FontSize = 16,
             FontAttributes = FontAttributes.Bold, TextColor = foreground, VerticalOptions = LayoutOptions.Center });
-        var pill = new Border { Background = background, StrokeThickness = 0, Padding = new Thickness(12, 8),
+        var pill = new Border { Background = model.IsClearArmed ? new SolidColorBrush(Color.FromArgb("#B42323")) : background,
+            StrokeThickness = 0, Padding = new Thickness(12, 8),
             StrokeShape = new RoundRectangle { CornerRadius = 24 }, Content = contents };
         var outline = new Border { Padding = 3, StrokeThickness = 2, MinimumHeightRequest = 58,
             StrokeShape = new RoundRectangle { CornerRadius = 29 }, Content = pill, InputTransparent = true };
         outline.SetAppTheme<Brush>(Border.StrokeProperty,
-            new SolidColorBrush(Color.FromArgb(model.IsSelected ? "#086B75" : "#B7B7C2")),
-            new SolidColorBrush(Color.FromArgb(model.IsSelected ? "#6BE1E8" : "#686873")));
+            new SolidColorBrush(Color.FromArgb(model.IsClearArmed ? "#B42323" : model.IsSelected ? "#086B75" : "#B7B7C2")),
+            new SolidColorBrush(Color.FromArgb(model.IsClearArmed ? "#FF8A8A" : model.IsSelected ? "#6BE1E8" : "#686873")));
         Content = outline;
-        SemanticProperties.SetDescription(this, $"{profile.DisplayName}, {model.Data.Count:N0} saved notifications{(model.IsSelected ? ", selected" : "")}");
-        SemanticProperties.SetHint(this, "Tap to show this app's history.");
+        SemanticProperties.SetDescription(this, model.IsClearArmed ? $"Clear {profile.DisplayName} history, favorites kept" :
+            $"{profile.DisplayName}, {model.Data.Count:N0} saved notifications{(model.IsSelected ? ", selected" : "")}");
+        SemanticProperties.SetHint(this, model.IsClearArmed ? "Tap to confirm clearing non-favorites. Cancel to keep history." :
+            "Tap to show this app's history. Long-press to clear its non-favorites.");
     }
 }

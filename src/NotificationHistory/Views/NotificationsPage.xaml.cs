@@ -1,6 +1,9 @@
 using NotificationHistory.Core.Models;
 using NotificationHistory.Services;
 using NotificationHistory.ViewModels;
+#if IOS
+using UIKit;
+#endif
 namespace NotificationHistory.Views;
 
 public partial class NotificationsPage : ContentPage
@@ -11,6 +14,31 @@ public partial class NotificationsPage : ContentPage
     private bool openingNotification;
     private bool deletingNotification;
     private SwipeView? openSwipe;
+    private AppBadgeModel? clearBadge;
+#if IOS
+    private UIView? outsideTapView;
+    private UITapGestureRecognizer? outsideTap;
+    protected override void OnHandlerChanged()
+    {
+        base.OnHandlerChanged();
+        if (Handler?.PlatformView is not UIView nativeView) return;
+        outsideTapView = nativeView;
+        outsideTap = new UITapGestureRecognizer(DismissBadgeClear) {
+            CancelsTouchesInView = false,
+            ShouldRecognizeSimultaneously = (_, _) => true,
+            ShouldReceiveTouch = (_, touch) => clearBadge is not null && !deletingNotification &&
+                !AppBadgeRow.Children.OfType<AppBadgeView>().Any(badge => badge.Handler?.PlatformView is UIView view &&
+                    touch.View is UIView touched && touched.IsDescendantOfView(view))
+        };
+        nativeView.AddGestureRecognizer(outsideTap);
+    }
+    protected override void OnHandlerChanging(HandlerChangingEventArgs args)
+    {
+        if (outsideTap is not null) { outsideTapView?.RemoveGestureRecognizer(outsideTap); outsideTap.Dispose(); outsideTap = null; }
+        outsideTapView = null;
+        base.OnHandlerChanging(args);
+    }
+#endif
     public NotificationsPage(AppServices services) { InitializeComponent(); this.services = services; vm = new(services); BindingContext = vm; }
     protected override async void OnAppearing()
     {
@@ -23,8 +51,8 @@ public partial class NotificationsPage : ContentPage
         }
         catch (Exception error) { await AppServices.StorageAlertAsync(error, "Storage unavailable", "Check App Group signing and free space on the device."); }
     }
-    protected override void OnDisappearing() { HistorySearch.Unfocus(); CloseSwipe(); services.Changed -= OnChanged; base.OnDisappearing(); }
-    private async Task ReloadAsync(bool debounce = false) { CloseSwipe(); await vm.ReloadAsync(debounce); }
+    protected override void OnDisappearing() { DismissBadgeClear(); HistorySearch.Unfocus(); CloseSwipe(); services.Changed -= OnChanged; base.OnDisappearing(); }
+    private async Task ReloadAsync(bool debounce = false) { DismissBadgeClear(); CloseSwipe(); await vm.ReloadAsync(debounce); }
     private void OnChanged(object? sender, EventArgs e) => MainThread.BeginInvokeOnMainThread(async () => await ReloadAsync());
     private async void OnSearch(object? sender, TextChangedEventArgs e)
     { if (vm is not null) { UpdateSearchControls(); vm.Search = e.NewTextValue; await ReloadAsync(true); } }
@@ -43,6 +71,7 @@ public partial class NotificationsPage : ContentPage
     private async void OnCardTapped(object? sender, TappedEventArgs e)
     {
         if (openingNotification || deletingNotification || sender is not View { BindingContext: NotificationCardModel card }) return;
+        DismissBadgeClear();
         if (openSwipe is not null) { CloseSwipe(); return; }
         openingNotification = true;
         try
@@ -55,7 +84,7 @@ public partial class NotificationsPage : ContentPage
     }
     private void CloseSwipe() { var swipe = openSwipe; openSwipe = null; swipe?.Close(); }
     private void OnSwipeStarted(object? sender, SwipeStartedEventArgs e)
-    { if (openSwipe is not null && !ReferenceEquals(openSwipe, sender)) CloseSwipe(); }
+    { DismissBadgeClear(); if (openSwipe is not null && !ReferenceEquals(openSwipe, sender)) CloseSwipe(); }
     private void OnSwipeEnded(object? sender, SwipeEndedEventArgs e)
     {
         if (sender is not SwipeView swipe) return;
@@ -75,9 +104,52 @@ public partial class NotificationsPage : ContentPage
         finally { deletingNotification = false; }
     }
     private async void OnFavoriteFilter(object? sender, EventArgs e) { vm.Favorites = !vm.Favorites; FavoriteButton.Text = vm.Favorites ? "★ Favorites" : "All"; await ReloadAsync(); }
-    private async void OnBadgeTapped(object? sender, TappedEventArgs e)
+    private void DismissBadgeClear()
     {
-        if (sender is not View { BindingContext: AppBadgeModel badge } || badge.IsSelected) return;
+        if (clearBadge is not null) clearBadge.IsClearArmed = false;
+        clearBadge = null; BadgeClearControls.IsVisible = false;
+    }
+    private void OnCancelBadgeClear(object? sender, EventArgs e) => DismissBadgeClear();
+    private void OnBadgeScrolled(object? sender, ScrolledEventArgs e)
+    {
+#if IOS
+        if (AppBadgeScroll.Handler?.PlatformView is UIScrollView { Dragging: false }) return;
+#endif
+        DismissBadgeClear();
+    }
+    private void OnHistoryScrolled(object? sender, ItemsViewScrolledEventArgs e)
+    {
+#if IOS
+        // Showing the Cancel row can resize the list. Only user scrolling cancels X.
+        if (sender is CollectionView list && list.Handler?.PlatformView is UIScrollView { Dragging: false }) return;
+#endif
+        if (e.HorizontalDelta != 0 || e.VerticalDelta != 0) DismissBadgeClear();
+    }
+    private void OnBadgeLongPressed(object? sender, EventArgs e)
+    {
+        if (openingNotification || deletingNotification || vm.Busy || sender is not AppBadgeView { BindingContext: AppBadgeModel badge } || badge.Data.Count == 0) return;
+        DismissBadgeClear(); HistorySearch.Unfocus(); CloseSwipe();
+        clearBadge = badge; badge.IsClearArmed = true; BadgeClearControls.IsVisible = true;
+    }
+    private async void OnBadgeTapped(object? sender, EventArgs e)
+    {
+        if (openingNotification || deletingNotification || sender is not AppBadgeView { BindingContext: AppBadgeModel badge }) return;
+        if (ReferenceEquals(clearBadge, badge) && badge.IsClearArmed)
+        {
+            // Freeze the target before showing a modal; refreshes must never change it.
+            var key = badge.SourceKey; var name = badge.DisplayName;
+            deletingNotification = true; DismissBadgeClear();
+            try
+            {
+                if (!await DisplayAlertAsync($"Clear {name} history?", $"All non-favorite notifications from {name} will be permanently deleted, including those outside your current filters. Favorites and app settings will be kept.", "Clear", "Cancel")) return;
+                await services.Database.ClearAppAsync(key); services.NotifyChanged();
+            }
+            catch (Exception error) { await AppServices.StorageAlertAsync(error, "Unable to clear app history", "Could not complete the cleanup. Please refresh history and try again."); }
+            finally { deletingNotification = false; }
+            return;
+        }
+        DismissBadgeClear();
+        if (badge.IsSelected) return;
         vm.SelectApp(badge.SourceKey); await ReloadAsync();
     }
     private async void OnSource(object? sender, EventArgs e)

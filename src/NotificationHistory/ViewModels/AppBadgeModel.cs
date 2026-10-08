@@ -10,6 +10,8 @@ public sealed class AppBadgeModel(AppBadgeData data, ImageSource? icon) : Observ
     public string Initial => new System.Globalization.StringInfo(DisplayName).SubstringByTextElements(0, 1).ToUpperInvariant();
     private bool selected;
     public bool IsSelected { get => selected; set => Set(ref selected, value); }
+    private bool clearArmed;
+    public bool IsClearArmed { get => clearArmed; set => Set(ref clearArmed, value); }
 
     public void Update(AppBadgeData data, ImageSource? icon)
     {

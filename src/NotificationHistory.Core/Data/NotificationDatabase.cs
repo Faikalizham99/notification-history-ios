@@ -121,6 +121,26 @@ public sealed class NotificationDatabase
     public Task SetFavoriteAsync(long id, bool value) => Run(db => db.Execute("UPDATE Notifications SET IsFavorite=? WHERE Id=?", value, id));
     public Task MarkReadAsync(long id) => Run(db => db.Execute("UPDATE Notifications SET IsRead=1 WHERE Id=?", id));
     public Task DeleteAsync(long id) => Run(db => db.Execute("DELETE FROM Notifications WHERE Id=?", id));
+    public Task<int> ClearAppAsync(string sourceKey) => Run(db =>
+    {
+        ArgumentNullException.ThrowIfNull(sourceKey);
+        var key = AppProfile.Key(sourceKey);
+        db.Execute("BEGIN IMMEDIATE");
+        try
+        {
+            // Resolve current variants under the writer lock, including captures made
+            // since the badge was loaded. SQLite UPPER alone would miss Unicode names.
+            var sources = db.Query<NotificationSourceCount>("SELECT DISTINCT SourceApp FROM Notifications")
+                .Where(row => AppProfile.Key(row.SourceApp) == key).Select(row => row.SourceApp).ToList();
+            var removed = 0;
+            foreach (var source in sources)
+                removed += source is null
+                    ? db.Execute("DELETE FROM Notifications WHERE IsFavorite=0 AND SourceApp IS NULL")
+                    : db.Execute("DELETE FROM Notifications WHERE IsFavorite=0 AND SourceApp=?", source);
+            db.Execute("COMMIT"); return removed;
+        }
+        catch { db.Execute("ROLLBACK"); throw; }
+    });
     public Task ClearAsync() => Run(db => { db.Execute("DELETE FROM Notifications WHERE IsFavorite=0"); db.ExecuteScalar<int>("PRAGMA wal_checkpoint(TRUNCATE)"); return 0; });
     public Task<string?> SettingAsync(string key) => Run(db => db.ExecuteScalar<string?>("SELECT Value FROM Settings WHERE Key=?", key));
     public Task SetSettingAsync(string key, string value) => Run(db => db.Execute("INSERT OR REPLACE INTO Settings(Key,Value) VALUES(?,?)", key, value));
